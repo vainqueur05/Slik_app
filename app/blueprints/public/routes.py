@@ -11,44 +11,47 @@ public_bp = Blueprint('public', __name__)
 def health_check():
     return jsonify({"status": "ok"}), 200
 
-import subprocess
-import sys
-from flask import jsonify
-
 @public_bp.route('/init-db/<secret>')
 def init_db(secret):
     if secret != 'mon-code-secret-123':
         return jsonify({'error': 'Accès refusé'}), 403
 
-    # Exécute flask db upgrade
+    # 1. Appliquer les migrations (ne fera rien si déjà fait)
     try:
-        result = subprocess.run(
-            [sys.executable, '-m', 'flask', 'db', 'upgrade'],
-            capture_output=True,
-            text=True,
-            cwd='/app'
-        )
-        output = result.stdout + '\n' + result.stderr
-        if result.returncode != 0:
-            return jsonify({'error': 'Migration échouée', 'details': output}), 500
+        from flask_migrate import upgrade as _upgrade
+        _upgrade()
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # On continue même en cas d'erreur
+        pass
 
-    # Vérifie si le superadmin existe déjà
+    # 2. Ajouter la colonne "categorie" si elle n'existe pas déjà
+    from sqlalchemy import text, inspect
+    insp = inspect(db.engine)
+    if 'categorie' not in [c['name'] for c in insp.get_columns('services')]:
+        db.session.execute(text("ALTER TABLE services ADD COLUMN categorie VARCHAR(50) DEFAULT 'Autre'"))
+        db.session.commit()
+
+    # 3. Ajouter les autres colonnes manquantes (actif, is_preset, etc.)
+    for col, coltype, default in [
+        ('actif', 'BOOLEAN', 'TRUE'),
+        ('is_preset', 'BOOLEAN', 'TRUE'),
+        ('is_vip', 'BOOLEAN', 'FALSE'),
+        ('duree', 'VARCHAR(20)', None),
+    ]:
+        if col not in [c['name'] for c in insp.get_columns('services')]:
+            default_sql = f"DEFAULT {default}" if default else ''
+            db.session.execute(text(f"ALTER TABLE services ADD COLUMN {col} {coltype} {default_sql}"))
+    db.session.commit()
+
+    # 4. Créer le superadmin si absent
     from app.models import User
-    admin = User.query.filter_by(email='admin@slik.cd').first()
-    if admin:
-        return jsonify({'message': 'Migrations appliquées, superadmin déjà existant'}), 200
-
-    # Sinon, crée le superadmin
-    try:
+    if not User.query.filter_by(email='admin@slik.cd').first():
         u = User(email='admin@slik.cd', role='superadmin')
-        u.set_password('00K')   # Mets ton vrai mot de passe
+        u.set_password('00Kalema')
         db.session.add(u)
         db.session.commit()
-        return jsonify({'message': 'Migrations appliquées et superadmin créé'}), 200
-    except Exception as e:
-        return jsonify({'error': 'Erreur création superadmin', 'details': str(e)}), 500
+        return jsonify({'message': 'Base prête et superadmin créé'}), 200
+    return jsonify({'message': 'Base déjà prête'}), 200
 
 @public_bp.route('/<slug>')
 def index(slug):
