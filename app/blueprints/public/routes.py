@@ -11,6 +11,23 @@ public_bp = Blueprint('public', __name__)
 def health_check():
     return jsonify({"status": "ok"}), 200
 
+@public_bp.route('/init-db/<secret>')
+def init_db(secret):
+    if secret != 'mon-code-secret-123':   # change ce code par un code que toi seul connais
+        return 'Accès refusé', 403
+
+    try:
+        from flask_migrate import upgrade
+        upgrade()
+        from app.models import User
+        u = User(email='admin@slik.cd', role='superadmin')
+        u.set_password('00Kalema')   # Mets ton vrai mot de passe
+        db.session.add(u)
+        db.session.commit()
+        return 'Base initialisée et superadmin créé ✅'
+    except Exception as e:
+        return f'Erreur : {str(e)}', 500
+
 @public_bp.route('/<slug>')
 def index(slug):
     tenant = Tenant.query.filter_by(slug=slug).first_or_404()
