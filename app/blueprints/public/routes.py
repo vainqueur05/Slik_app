@@ -121,29 +121,32 @@ def init_db(secret):
     if secret != 'mon-code-secret-123':
         return jsonify({'error': 'Accès refusé'}), 403
 
-    from sqlalchemy import text
     import subprocess, sys
+    from sqlalchemy import text
 
     try:
-        # Annuler toute transaction en cours
+        # Rollback toute transaction bloquée
         db.session.rollback()
         
-        # Appliquer les migrations
+        # Exécute les migrations (tout créer de zéro)
         result = subprocess.run(
             [sys.executable, '-m', 'flask', 'db', 'upgrade'],
             capture_output=True, text=True, cwd='/app'
         )
         
-        # Créer le superadmin
+        # Crée le superadmin
         from app.models import User
         if not User.query.filter_by(email='admin@slik.cd').first():
             u = User(email='admin@slik.cd', role='superadmin')
             u.set_password('00Kalema')
             db.session.add(u)
             db.session.commit()
-            return jsonify({'message': 'Migrations OK, superadmin créé', 'output': result.stdout[-300:]}), 200
-        return jsonify({'message': 'Migrations OK, superadmin déjà existant', 'output': result.stdout[-300:]}), 200
+            msg = 'Base créée et superadmin ajouté'
+        else:
+            msg = 'Base déjà prête'
+            
+        return jsonify({'message': msg, 'migration': result.stdout[-200:]}), 200
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e), 'stdout': result.stdout if 'result' in locals() else '', 'stderr': result.stderr if 'result' in locals() else ''}), 500
+        return jsonify({'error': str(e)}), 500
