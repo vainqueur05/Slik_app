@@ -16,147 +16,131 @@ def init_db(secret):
     if secret != 'mon-code-secret-123':
         return jsonify({'error': 'Accès refusé'}), 403
 
+    import subprocess, sys
     from sqlalchemy import text, inspect
-    insp = inspect(db.engine)
 
-    # --- Étape 1 : ajouter les colonnes manquantes dans services ---
-    if 'categorie' not in [c['name'] for c in insp.get_columns('services')]:
-        db.session.execute(text("ALTER TABLE services ADD COLUMN categorie VARCHAR(50) DEFAULT 'Autre'"))
+    # 1. Appliquer toutes les migrations Flask
+    result = subprocess.run(
+        [sys.executable, '-m', 'flask', 'db', 'upgrade'],
+        capture_output=True, text=True, cwd='/app'
+    )
+    if result.returncode != 0:
+        return jsonify({'error': 'Échec migration', 'stdout': result.stdout, 'stderr': result.stderr}), 500
+
+    # 2. Recréer les triggers (ils utiliseront les tables déjà existantes)
+    try:
+        # Fonction insert_default_categories
+        db.session.execute(text("""
+        CREATE OR REPLACE FUNCTION insert_default_categories()
+        RETURNS TRIGGER AS $BODY$
+        BEGIN
+            INSERT INTO salon_categories (tenant_slug, categorie) VALUES
+                (NEW.slug, 'Coiffure Femme'),
+                (NEW.slug, 'Coiffure Mariee'),
+                (NEW.slug, 'Barber'),
+                (NEW.slug, 'Coiffure Homme'),
+                (NEW.slug, 'Make-up'),
+                (NEW.slug, 'Onglerie'),
+                (NEW.slug, 'Cils/Sourcils'),
+                (NEW.slug, 'Soins Visage'),
+                (NEW.slug, 'Autre');
+            RETURN NEW;
+        END;
+        $BODY$ LANGUAGE plpgsql;
+        """))
+        db.session.execute(text("DROP TRIGGER IF EXISTS after_tenant_insert ON tenants"))
+        db.session.execute(text("""
+        CREATE TRIGGER after_tenant_insert AFTER INSERT ON tenants
+        FOR EACH ROW EXECUTE FUNCTION insert_default_categories();
+        """))
+        db.session.execute(text("""
+        CREATE OR REPLACE FUNCTION insert_preset_services()
+        RETURNS TRIGGER AS $BODY$
+        BEGIN
+            IF NEW.categorie = 'Coiffure Femme' THEN
+                INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Pose perruque', '15$', '1h', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Tissage lace', '20$', '2h', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Tissage closure', '20$', '2h', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Brushing', '10$', '45min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Box Braids Longues', '35$', '4h', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Fulani Braids', '40$', '5h', TRUE, TRUE);
+            ELSIF NEW.categorie = 'Coiffure Mariee' THEN
+                INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, is_vip, actif) VALUES
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Mariee', '3 coiffures', '150$', '5h', TRUE, TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Mariee', '2 coiffures', '100$', '3h', TRUE, FALSE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Mariee', '1 coiffure', '50$', '2h', TRUE, FALSE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Mariee', 'Forfait 3 coiff + 3 make-up', '180$', '6h', TRUE, TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Mariee', 'Forfait VIP Complet', '400$', 'journee', TRUE, TRUE, TRUE);
+            ELSIF NEW.categorie = 'Barber' THEN
+                INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
+                    (gen_random_uuid(), NEW.tenant_slug, 'Barber', 'Coupe Classique', '5.000FC', '20min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Barber', 'Degrade Americain', '7.000FC', '30min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Barber', 'Taille Barbe', '5.000FC', '15min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Barber', 'Soin Barbe Complet', '10.000FC', '30min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Barber', 'Combo Coupe+Barbe', '10.000FC', '40min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Barber', 'Gommage Visage', '8.000FC', '20min', TRUE, TRUE);
+            ELSIF NEW.categorie = 'Coiffure Homme' THEN
+                INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Homme', 'Coupe Homme Classique', '8.000FC', '25min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Homme', 'Coupe Afro', '10.000FC', '30min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Homme', 'Torsades', '10.000FC', '45min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Homme', 'Vanilles', '12.000FC', '40min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Homme', 'Coloration', '15.000FC', '1h', TRUE, TRUE);
+            ELSIF NEW.categorie = 'Make-up' THEN
+                INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
+                    (gen_random_uuid(), NEW.tenant_slug, 'Make-up', 'Simple', '15$', '30min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Make-up', 'Soiree', '20$', '45min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Make-up', 'Nude', '10$', '30min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Make-up', 'Mariee Essai+JourJ', '80$', '2h', TRUE, TRUE);
+            ELSIF NEW.categorie = 'Onglerie' THEN
+                INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
+                    (gen_random_uuid(), NEW.tenant_slug, 'Onglerie', 'Vernis permanent', '7.000FC', '45min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Onglerie', 'Capsule simple', '5$', '1h', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Onglerie', 'Capsule+gel', '10$', '1h30', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Onglerie', 'Pedicure Spa', '15$', '1h', TRUE, TRUE);
+            ELSIF NEW.categorie = 'Cils/Sourcils' THEN
+                INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
+                    (gen_random_uuid(), NEW.tenant_slug, 'Cils/Sourcils', 'Pose simple', '5$', '20min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Cils/Sourcils', 'Extensions naturel', '15$', '45min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Cils/Sourcils', 'Microshading', '30$', '1h30', TRUE, TRUE);
+            ELSIF NEW.categorie = 'Soins Visage' THEN
+                INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
+                    (gen_random_uuid(), NEW.tenant_slug, 'Soins Visage', 'Simple', '15$', '30min', TRUE, TRUE),
+                    (gen_random_uuid(), NEW.tenant_slug, 'Soins Visage', 'Complet', '20$', '1h', TRUE, TRUE);
+            END IF;
+            RETURN NEW;
+        END;
+        $BODY$ LANGUAGE plpgsql;
+        """))
+        db.session.execute(text("DROP TRIGGER IF EXISTS after_category_insert ON salon_categories"))
+        db.session.execute(text("""
+        CREATE TRIGGER after_category_insert AFTER INSERT ON salon_categories
+        FOR EACH ROW EXECUTE FUNCTION insert_preset_services();
+        """))
         db.session.commit()
-    for col, coltype, default in [
-        ('actif', 'BOOLEAN', 'TRUE'),
-        ('is_preset', 'BOOLEAN', 'TRUE'),
-        ('is_vip', 'BOOLEAN', 'FALSE'),
-        ('duree', 'VARCHAR(20)', None),
-    ]:
-        if col not in [c['name'] for c in insp.get_columns('services')]:
-            default_sql = f"DEFAULT {default}" if default else ''
-            db.session.execute(text(f"ALTER TABLE services ADD COLUMN {col} {coltype} {default_sql}"))
-    db.session.commit()
+    except Exception as e:
+        return jsonify({'error': 'Erreur lors de la création des triggers', 'details': str(e)}), 500
 
-    # --- Étape 2 : recréer les deux fonctions et les triggers ---
-    # Fonction insert_default_categories()
-    db.session.execute(text("""
-    CREATE OR REPLACE FUNCTION insert_default_categories()
-    RETURNS TRIGGER AS $BODY$
-    BEGIN
-        INSERT INTO salon_categories (tenant_slug, categorie) VALUES
-            (NEW.slug, 'Coiffure Femme'),
-            (NEW.slug, 'Coiffure Mariee'),
-            (NEW.slug, 'Barber'),
-            (NEW.slug, 'Coiffure Homme'),
-            (NEW.slug, 'Make-up'),
-            (NEW.slug, 'Onglerie'),
-            (NEW.slug, 'Cils/Sourcils'),
-            (NEW.slug, 'Soins Visage'),
-            (NEW.slug, 'Autre');
-        RETURN NEW;
-    END;
-    $BODY$ LANGUAGE plpgsql;
-    """))
-    db.session.commit()
-
-    # Trigger after_tenant_insert
-    db.session.execute(text("DROP TRIGGER IF EXISTS after_tenant_insert ON tenants"))
-    db.session.execute(text("""
-    CREATE TRIGGER after_tenant_insert
-    AFTER INSERT ON tenants
-    FOR EACH ROW EXECUTE FUNCTION insert_default_categories();
-    """))
-    db.session.commit()
-
-    # Fonction insert_preset_services()
-    db.session.execute(text("""
-    CREATE OR REPLACE FUNCTION insert_preset_services()
-    RETURNS TRIGGER AS $BODY$
-    BEGIN
-        IF NEW.categorie = 'Coiffure Femme' THEN
-            INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Pose perruque', '15$', '1h', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Tissage lace', '20$', '2h', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Tissage closure', '20$', '2h', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Brushing', '10$', '45min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Box Braids Longues', '35$', '4h', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Fulani Braids', '40$', '5h', TRUE, TRUE);
-        ELSIF NEW.categorie = 'Coiffure Mariee' THEN
-            INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, is_vip, actif) VALUES
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Mariee', '3 coiffures', '150$', '5h', TRUE, TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Mariee', '2 coiffures', '100$', '3h', TRUE, FALSE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Mariee', '1 coiffure', '50$', '2h', TRUE, FALSE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Mariee', 'Forfait 3 coiff + 3 make-up', '180$', '6h', TRUE, TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Mariee', 'Forfait VIP Complet', '400$', 'journee', TRUE, TRUE, TRUE);
-        ELSIF NEW.categorie = 'Barber' THEN
-            INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
-                (gen_random_uuid(), NEW.tenant_slug, 'Barber', 'Coupe Classique', '5.000FC', '20min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Barber', 'Degrade Americain', '7.000FC', '30min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Barber', 'Taille Barbe', '5.000FC', '15min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Barber', 'Soin Barbe Complet', '10.000FC', '30min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Barber', 'Combo Coupe+Barbe', '10.000FC', '40min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Barber', 'Gommage Visage', '8.000FC', '20min', TRUE, TRUE);
-        ELSIF NEW.categorie = 'Coiffure Homme' THEN
-            INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Homme', 'Coupe Homme Classique', '8.000FC', '25min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Homme', 'Coupe Afro', '10.000FC', '30min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Homme', 'Torsades', '10.000FC', '45min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Homme', 'Vanilles', '12.000FC', '40min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Homme', 'Coloration', '15.000FC', '1h', TRUE, TRUE);
-        ELSIF NEW.categorie = 'Make-up' THEN
-            INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
-                (gen_random_uuid(), NEW.tenant_slug, 'Make-up', 'Simple', '15$', '30min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Make-up', 'Soiree', '20$', '45min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Make-up', 'Nude', '10$', '30min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Make-up', 'Mariee Essai+JourJ', '80$', '2h', TRUE, TRUE);
-        ELSIF NEW.categorie = 'Onglerie' THEN
-            INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
-                (gen_random_uuid(), NEW.tenant_slug, 'Onglerie', 'Vernis permanent', '7.000FC', '45min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Onglerie', 'Capsule simple', '5$', '1h', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Onglerie', 'Capsule+gel', '10$', '1h30', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Onglerie', 'Pedicure Spa', '15$', '1h', TRUE, TRUE);
-        ELSIF NEW.categorie = 'Cils/Sourcils' THEN
-            INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
-                (gen_random_uuid(), NEW.tenant_slug, 'Cils/Sourcils', 'Pose simple', '5$', '20min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Cils/Sourcils', 'Extensions naturel', '15$', '45min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Cils/Sourcils', 'Microshading', '30$', '1h30', TRUE, TRUE);
-        ELSIF NEW.categorie = 'Soins Visage' THEN
-            INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
-                (gen_random_uuid(), NEW.tenant_slug, 'Soins Visage', 'Simple', '15$', '30min', TRUE, TRUE),
-                (gen_random_uuid(), NEW.tenant_slug, 'Soins Visage', 'Complet', '20$', '1h', TRUE, TRUE);
-        END IF;
-        RETURN NEW;
-    END;
-    $BODY$ LANGUAGE plpgsql;
-    """))
-    db.session.commit()
-
-    # Trigger after_category_insert
-    db.session.execute(text("DROP TRIGGER IF EXISTS after_category_insert ON salon_categories"))
-    db.session.execute(text("""
-    CREATE TRIGGER after_category_insert
-    AFTER INSERT ON salon_categories
-    FOR EACH ROW EXECUTE FUNCTION insert_preset_services();
-    """))
-    db.session.commit()
-
-    # --- Étape 3 : peupler les catégories et services pour les salons existants ---
-    from app.models import Tenant, SalonCategory, Service
+    # 3. Peupler les salons existants
+    from app.models import Tenant, SalonCategory
     categories_list = ['Coiffure Femme', 'Coiffure Mariee', 'Barber', 'Coiffure Homme', 'Make-up', 'Onglerie', 'Cils/Sourcils', 'Soins Visage', 'Autre']
     for tenant in Tenant.query.all():
-        # Ajouter les catégories manquantes (le trigger insérera les services)
         existing_cats = [c.categorie for c in SalonCategory.query.filter_by(tenant_slug=tenant.slug).all()]
         for cat in categories_list:
             if cat not in existing_cats:
                 db.session.add(SalonCategory(tenant_slug=tenant.slug, categorie=cat))
     db.session.commit()
 
-    # --- Étape 4 : superadmin ---
+    # 4. Superadmin (si absent)
     from app.models import User
     if not User.query.filter_by(email='admin@slik.cd').first():
         u = User(email='admin@slik.cd', role='superadmin')
-        u.set_password('00Kalema')
+        u.set_password('MotDePasseSur')
         db.session.add(u)
         db.session.commit()
-        return jsonify({'message': 'Base prête, triggers créés, services peuplés, superadmin ajouté'}), 200
-    return jsonify({'message': 'Base déjà prête, triggers et services mis à jour'}), 200
+        return jsonify({'message': 'Base prête, triggers créés, services peuplés, superadmin créé'}), 200
+    return jsonify({'message': 'Base déjà prête, triggers/services mis à jour'}), 200
 @public_bp.route('/<slug>')
 def index(slug):
     tenant = Tenant.query.filter_by(slug=slug).first_or_404()
