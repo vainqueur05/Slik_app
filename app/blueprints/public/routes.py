@@ -121,31 +121,144 @@ def init_db(secret):
     if secret != 'mon-code-secret-123':
         return jsonify({'error': 'Accès refusé'}), 403
 
-    import subprocess, sys
     from sqlalchemy import text
 
     try:
-        # Rollback toute transaction bloquée
         db.session.rollback()
         
-        # Exécute les migrations (tout créer de zéro)
-        result = subprocess.run(
-            [sys.executable, '-m', 'flask', 'db', 'upgrade'],
-            capture_output=True, text=True, cwd='/app'
-        )
+        # Création de toutes les tables dans l'ordre (sans FK d'abord)
+        db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS tenants (
+            id SERIAL PRIMARY KEY,
+            slug VARCHAR(50) UNIQUE NOT NULL,
+            nom VARCHAR(100) NOT NULL,
+            phone VARCHAR(20),
+            ville VARCHAR(100),
+            adresse_text TEXT,
+            lat FLOAT,
+            lng FLOAT,
+            logo_cloudinary_id VARCHAR(200),
+            logo_url VARCHAR(500),
+            video_hero_cloudinary_id VARCHAR(200),
+            video_url VARCHAR(500),
+            cover_cloudinary_id VARCHAR(200),
+            cover_url VARCHAR(500),
+            theme_json TEXT DEFAULT '{}',
+            active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT NOW(),
+            last_payment_date TIMESTAMP DEFAULT NOW()
+        );
         
-        # Crée le superadmin
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            email VARCHAR(120) UNIQUE NOT NULL,
+            password_hash VARCHAR(256) NOT NULL,
+            role VARCHAR(20) DEFAULT 'tenant_admin',
+            tenant_slug VARCHAR(50) REFERENCES tenants(slug),
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+        
+        CREATE TABLE IF NOT EXISTS coiffeurs (
+            id SERIAL PRIMARY KEY,
+            tenant_slug VARCHAR(50) REFERENCES tenants(slug),
+            nom VARCHAR(100) NOT NULL,
+            photo_cloudinary_id VARCHAR(200),
+            photo_url VARCHAR(500),
+            specialite VARCHAR(200),
+            instagram VARCHAR(100),
+            annees_exp INTEGER,
+            active BOOLEAN DEFAULT TRUE
+        );
+        
+        CREATE TABLE IF NOT EXISTS services (
+            id VARCHAR(36) PRIMARY KEY,
+            tenant_slug VARCHAR(50) REFERENCES tenants(slug),
+            categorie VARCHAR(50) DEFAULT 'Autre',
+            nom VARCHAR(100) NOT NULL,
+            prix VARCHAR(20),
+            duree VARCHAR(20),
+            ordre INTEGER DEFAULT 0,
+            active BOOLEAN DEFAULT FALSE,
+            is_preset BOOLEAN DEFAULT TRUE,
+            is_vip BOOLEAN DEFAULT FALSE,
+            photo_cloudinary_id VARCHAR(200),
+            photo_url VARCHAR(500),
+            description_psycho TEXT,
+            prix_barre FLOAT
+        );
+        
+        CREATE TABLE IF NOT EXISTS bookings (
+            id SERIAL PRIMARY KEY,
+            tenant_slug VARCHAR(50) REFERENCES tenants(slug),
+            client_nom VARCHAR(100) NOT NULL,
+            client_phone VARCHAR(20),
+            service_id VARCHAR(36) REFERENCES services(id),
+            coiffeur_id INTEGER REFERENCES coiffeurs(id),
+            start_time TIMESTAMP,
+            status VARCHAR(20) DEFAULT 'en_attente'
+        );
+        
+        CREATE TABLE IF NOT EXISTS temoignages (
+            id SERIAL PRIMARY KEY,
+            tenant_slug VARCHAR(50) REFERENCES tenants(slug),
+            client_nom VARCHAR(100),
+            texte TEXT,
+            note INTEGER,
+            photo_cloudinary_id VARCHAR(200),
+            photo_url VARCHAR(500),
+            consentement_photo BOOLEAN DEFAULT FALSE,
+            approved BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+        
+        CREATE TABLE IF NOT EXISTS galerie (
+            id SERIAL PRIMARY KEY,
+            tenant_slug VARCHAR(50) REFERENCES tenants(slug),
+            photo_cloudinary_id VARCHAR(200) NOT NULL,
+            photo_url VARCHAR(500) NOT NULL,
+            type VARCHAR(20) DEFAULT 'avant',
+            legende VARCHAR(200)
+        );
+        
+        CREATE TABLE IF NOT EXISTS logs (
+            id SERIAL PRIMARY KEY,
+            tenant_slug VARCHAR(50) REFERENCES tenants(slug),
+            event_type VARCHAR(50),
+            message TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+        
+        CREATE TABLE IF NOT EXISTS salon_categories (
+            id SERIAL PRIMARY KEY,
+            tenant_slug VARCHAR(50) REFERENCES tenants(slug),
+            categorie VARCHAR(50) NOT NULL,
+            UNIQUE(tenant_slug, categorie)
+        );
+        
+        CREATE TABLE IF NOT EXISTS reservations (
+            id VARCHAR(36) PRIMARY KEY,
+            tenant_slug VARCHAR(50) REFERENCES tenants(slug),
+            client_nom VARCHAR(100),
+            client_tel VARCHAR(20),
+            service_id VARCHAR(36) REFERENCES services(id),
+            date_rdv DATE,
+            heure_rdv TIME,
+            statut VARCHAR(20) DEFAULT 'confirmé',
+            note TEXT,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+        """))
+        db.session.commit()
+        
+        # Créer le superadmin
         from app.models import User
         if not User.query.filter_by(email='admin@slik.cd').first():
             u = User(email='admin@slik.cd', role='superadmin')
             u.set_password('00Kalema')
             db.session.add(u)
             db.session.commit()
-            msg = 'Base créée et superadmin ajouté'
-        else:
-            msg = 'Base déjà prête'
-            
-        return jsonify({'message': msg, 'migration': result.stdout[-200:]}), 200
+            return jsonify({'message': 'Toutes les tables créées, superadmin ajouté'}), 200
+        return jsonify({'message': 'Tables déjà existantes'}), 200
         
     except Exception as e:
         db.session.rollback()
