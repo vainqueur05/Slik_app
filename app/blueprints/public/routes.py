@@ -7,56 +7,6 @@ from app.utils.tenant import get_tenant_slug
 
 public_bp = Blueprint('public', __name__)
 
-@public_bp.route('/health')
-def health_check():
-    return jsonify({"status": "ok"}), 200
-
-@public_bp.route('/init-db/<secret>')
-def init_db(secret):
-    if secret != 'mon-code-secret-123':
-        return jsonify({'error': 'Accès refusé'}), 403
-
-    from sqlalchemy import text
-
-    try:
-        # 1. Annule toute transaction en cours
-        db.session.rollback()
-        
-        # 2. Supprime toutes les tables existantes
-        db.session.execute(text("DROP TABLE IF EXISTS reservations CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS bookings CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS salon_categories CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS services CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS coiffeurs CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS temoignages CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS galerie CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS logs CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS users CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS tenants CASCADE"))
-        db.session.commit()
-        
-        # 3. Recrée tout avec les migrations Flask
-        import subprocess, sys
-        result = subprocess.run(
-            [sys.executable, '-m', 'flask', 'db', 'upgrade'],
-            capture_output=True, text=True, cwd='/app'
-        )
-        
-        # 4. Créer le superadmin
-        from app.models import User
-        u = User(email='admin@slik.cd', role='superadmin')
-        u.set_password('00Kalema')
-        db.session.add(u)
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Base réinitialisée avec succès. Superadmin créé.',
-            'migration_output': result.stdout[-500:]
-        }), 200
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
 @public_bp.route('/<slug>')
 def index(slug):
     tenant = Tenant.query.filter_by(slug=slug).first_or_404()
@@ -93,7 +43,13 @@ def add_temoignage(slug):
     db.session.commit()
     return "<div class='bg-green-700 text-white px-4 py-2 rounded shadow-lg'>Merci ! Votre avis est en attente de validation.</div>"
 
-# ---------- UNIQUE route de réservation (POST) ----------
+@public_bp.route('/<slug>/booking')
+def booking_form(slug):
+    tenant = Tenant.query.filter_by(slug=slug, active=True).first_or_404()
+    services = Service.query.filter_by(tenant_slug=slug, active=True).order_by(Service.ordre).all()
+    coiffeurs = Coiffeur.query.filter_by(tenant_slug=slug, active=True).all()
+    return render_template('public/booking.html', tenant=tenant, services=services, coiffeurs=coiffeurs)
+
 @public_bp.route('/<slug>/booking', methods=['POST'])
 def submit_booking(slug):
     tenant = Tenant.query.filter_by(slug=slug, active=True).first_or_404()
@@ -125,14 +81,6 @@ def submit_booking(slug):
     db.session.commit()
     return "<div class='bg-green-700 text-white px-4 py-2 rounded'>Réservation enregistrée. Le salon vous contactera.</div>"
 
-# ---------- Page de réservation (optionnelle) ----------
-@public_bp.route('/<slug>/booking')
-def booking_form(slug):
-    tenant = Tenant.query.filter_by(slug=slug, active=True).first_or_404()
-    services = Service.query.filter_by(tenant_slug=slug, active=True).order_by(Service.ordre).all()
-    coiffeurs = Coiffeur.query.filter_by(tenant_slug=slug, active=True).all()
-    return render_template('public/booking.html', tenant=tenant, services=services, coiffeurs=coiffeurs)
-
 @public_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -162,4 +110,40 @@ def login():
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('public.index', slug='login'))
+    return redirect(url_for('public.login'))
+
+@public_bp.route('/health')
+def health():
+    return jsonify({'status': 'ok'}), 200
+
+@public_bp.route('/init-db/<secret>')
+def init_db(secret):
+    if secret != 'mon-code-secret-123':
+        return jsonify({'error': 'Accès refusé'}), 403
+
+    from sqlalchemy import text
+    import subprocess, sys
+
+    try:
+        # Annuler toute transaction en cours
+        db.session.rollback()
+        
+        # Appliquer les migrations
+        result = subprocess.run(
+            [sys.executable, '-m', 'flask', 'db', 'upgrade'],
+            capture_output=True, text=True, cwd='/app'
+        )
+        
+        # Créer le superadmin
+        from app.models import User
+        if not User.query.filter_by(email='admin@slik.cd').first():
+            u = User(email='admin@slik.cd', role='superadmin')
+            u.set_password('00Kalema')
+            db.session.add(u)
+            db.session.commit()
+            return jsonify({'message': 'Migrations OK, superadmin créé', 'output': result.stdout[-300:]}), 200
+        return jsonify({'message': 'Migrations OK, superadmin déjà existant', 'output': result.stdout[-300:]}), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e), 'stdout': result.stdout if 'result' in locals() else '', 'stderr': result.stderr if 'result' in locals() else ''}), 500
