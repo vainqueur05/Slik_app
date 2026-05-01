@@ -120,7 +120,7 @@ def admin_service_create(slug):
         prix=prix,
         duree=duree,
         is_preset=False,
-        actif=True,
+        active=True,
         ordre=Service.query.filter_by(tenant_slug=slug, categorie=categorie).count()
     )
     db.session.add(service)
