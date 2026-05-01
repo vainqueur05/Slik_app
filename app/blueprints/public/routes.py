@@ -11,22 +11,32 @@ public_bp = Blueprint('public', __name__)
 def health_check():
     return jsonify({"status": "ok"}), 200
 
+import subprocess
+from flask_migrate import upgrade as migrate_upgrade
+
 @public_bp.route('/init-db/<secret>')
 def init_db(secret):
-    if secret != 'mon-code-secret-123':   # change ce code par un code que toi seul connais
-        return 'Accès refusé', 403
+    if secret != 'mon-code-secret-123':  # Remplacez par votre code secret
+        return jsonify({'error': 'Accès refusé'}), 403
 
     try:
-        from flask_migrate import upgrade
-        upgrade()
+        # Exécute les migrations
+        from app import create_app
+        app = create_app()
+        with app.app_context():
+            migrate_upgrade()
+        
+        # Crée le superadmin
         from app.models import User
-        u = User(email='admin@slik.cd', role='superadmin')
-        u.set_password('00Kalema')   # Mets ton vrai mot de passe
-        db.session.add(u)
-        db.session.commit()
-        return 'Base initialisée et superadmin créé ✅'
+        with app.app_context():
+            u = User(email='admin@slik.cd', role='superadmin')
+            u.set_password('00Kalema')  # Votre mot de passe
+            db.session.add(u)
+            db.session.commit()
+        
+        return jsonify({'message': 'Base initialisée et superadmin créé avec succès'}), 200
     except Exception as e:
-        return f'Erreur : {str(e)}', 500
+        return jsonify({'error': str(e)}), 500
 
 @public_bp.route('/<slug>')
 def index(slug):
