@@ -12,31 +12,43 @@ def health_check():
     return jsonify({"status": "ok"}), 200
 
 import subprocess
-from flask_migrate import upgrade as migrate_upgrade
+import sys
+from flask import jsonify
 
 @public_bp.route('/init-db/<secret>')
 def init_db(secret):
-    if secret != 'mon-code-secret-123':  # Remplacez par votre code secret
+    if secret != 'mon-code-secret-123':
         return jsonify({'error': 'Accès refusé'}), 403
 
+    # Exécute flask db upgrade
     try:
-        # Exécute les migrations
-        from app import create_app
-        app = create_app()
-        with app.app_context():
-            migrate_upgrade()
-        
-        # Crée le superadmin
-        from app.models import User
-        with app.app_context():
-            u = User(email='admin@slik.cd', role='superadmin')
-            u.set_password('00Kalema')  # Votre mot de passe
-            db.session.add(u)
-            db.session.commit()
-        
-        return jsonify({'message': 'Base initialisée et superadmin créé avec succès'}), 200
+        result = subprocess.run(
+            [sys.executable, '-m', 'flask', 'db', 'upgrade'],
+            capture_output=True,
+            text=True,
+            cwd='/app'
+        )
+        output = result.stdout + '\n' + result.stderr
+        if result.returncode != 0:
+            return jsonify({'error': 'Migration échouée', 'details': output}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+    # Vérifie si le superadmin existe déjà
+    from app.models import User
+    admin = User.query.filter_by(email='admin@slik.cd').first()
+    if admin:
+        return jsonify({'message': 'Migrations appliquées, superadmin déjà existant'}), 200
+
+    # Sinon, crée le superadmin
+    try:
+        u = User(email='admin@slik.cd', role='superadmin')
+        u.set_password('00K')   # Mets ton vrai mot de passe
+        db.session.add(u)
+        db.session.commit()
+        return jsonify({'message': 'Migrations appliquées et superadmin créé'}), 200
+    except Exception as e:
+        return jsonify({'error': 'Erreur création superadmin', 'details': str(e)}), 500
 
 @public_bp.route('/<slug>')
 def index(slug):
