@@ -18,22 +18,45 @@ def init_db(secret):
 
     from sqlalchemy import text
 
-    # 1. Renommer la colonne actif → active (si elle existe encore)
     try:
-        db.session.execute(text("ALTER TABLE services RENAME COLUMN actif TO active"))
+        # 1. Annule toute transaction en cours
+        db.session.rollback()
+        
+        # 2. Supprime toutes les tables existantes
+        db.session.execute(text("DROP TABLE IF EXISTS reservations CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS bookings CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS salon_categories CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS services CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS coiffeurs CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS temoignages CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS galerie CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS logs CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS users CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS tenants CASCADE"))
         db.session.commit()
-    except:
-        pass  # déjà renommée ou n'existe pas
-
-    # 2. Créer le superadmin si absent
-    from app.models import User
-    if not User.query.filter_by(email='admin@slik.cd').first():
+        
+        # 3. Recrée tout avec les migrations Flask
+        import subprocess, sys
+        result = subprocess.run(
+            [sys.executable, '-m', 'flask', 'db', 'upgrade'],
+            capture_output=True, text=True, cwd='/app'
+        )
+        
+        # 4. Créer le superadmin
+        from app.models import User
         u = User(email='admin@slik.cd', role='superadmin')
         u.set_password('00Kalema')
         db.session.add(u)
         db.session.commit()
-        return jsonify({'message': 'Colonne renommée, superadmin créé'}), 200
-    return jsonify({'message': 'Base OK'}), 200
+        
+        return jsonify({
+            'message': 'Base réinitialisée avec succès. Superadmin créé.',
+            'migration_output': result.stdout[-500:]
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 @public_bp.route('/<slug>')
 def index(slug):
     tenant = Tenant.query.filter_by(slug=slug).first_or_404()
