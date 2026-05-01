@@ -126,22 +126,23 @@ def init_db(secret):
     try:
         db.session.rollback()
         
-        # Suppression de toutes les tables existantes
-        db.session.execute(text("DROP TABLE IF EXISTS reservations CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS salon_categories CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS bookings CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS galerie CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS logs CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS temoignages CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS coiffeurs CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS services CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS users CASCADE"))
-        db.session.execute(text("DROP TABLE IF EXISTS tenants CASCADE"))
+        # Supprime tout
+        db.session.execute(text("""
+        DROP TABLE IF EXISTS reservations CASCADE;
+        DROP TABLE IF EXISTS salon_categories CASCADE;
+        DROP TABLE IF EXISTS bookings CASCADE;
+        DROP TABLE IF EXISTS galerie CASCADE;
+        DROP TABLE IF EXISTS logs CASCADE;
+        DROP TABLE IF EXISTS temoignages CASCADE;
+        DROP TABLE IF EXISTS coiffeurs CASCADE;
+        DROP TABLE IF EXISTS services CASCADE;
+        DROP TABLE IF EXISTS users CASCADE;
+        DROP TABLE IF EXISTS tenants CASCADE;
+        """))
         db.session.commit()
         
-        # Création de TOUTES les tables avec TOUTES les colonnes
+        # Recrée tout
         db.session.execute(text("""
-        -- Tenants
         CREATE TABLE tenants (
             id SERIAL PRIMARY KEY,
             slug VARCHAR(50) UNIQUE NOT NULL,
@@ -163,7 +164,6 @@ def init_db(secret):
             last_payment_date TIMESTAMP DEFAULT NOW()
         );
 
-        -- Users
         CREATE TABLE users (
             id SERIAL PRIMARY KEY,
             email VARCHAR(120) UNIQUE NOT NULL,
@@ -173,7 +173,6 @@ def init_db(secret):
             created_at TIMESTAMP DEFAULT NOW()
         );
 
-        -- Services
         CREATE TABLE services (
             id VARCHAR(36) PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
@@ -191,7 +190,6 @@ def init_db(secret):
             prix_barre FLOAT
         );
 
-        -- Coiffeurs
         CREATE TABLE coiffeurs (
             id SERIAL PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
@@ -204,7 +202,6 @@ def init_db(secret):
             active BOOLEAN DEFAULT TRUE
         );
 
-        -- Bookings (avec acompte_tx_id)
         CREATE TABLE bookings (
             id SERIAL PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
@@ -217,7 +214,6 @@ def init_db(secret):
             acompte_tx_id VARCHAR(200)
         );
 
-        -- Temoignages
         CREATE TABLE temoignages (
             id SERIAL PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
@@ -231,7 +227,6 @@ def init_db(secret):
             created_at TIMESTAMP DEFAULT NOW()
         );
 
-        -- Galerie
         CREATE TABLE galerie (
             id SERIAL PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
@@ -241,7 +236,6 @@ def init_db(secret):
             legende VARCHAR(200)
         );
 
-        -- Logs
         CREATE TABLE logs (
             id SERIAL PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
@@ -250,7 +244,6 @@ def init_db(secret):
             created_at TIMESTAMP DEFAULT NOW()
         );
 
-        -- Salon Categories
         CREATE TABLE salon_categories (
             id SERIAL PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
@@ -258,7 +251,6 @@ def init_db(secret):
             UNIQUE(tenant_slug, categorie)
         );
 
-        -- Reservations
         CREATE TABLE reservations (
             id VARCHAR(36) PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
@@ -281,7 +273,7 @@ def init_db(secret):
         db.session.add(u)
         db.session.commit()
         
-        return jsonify({'message': 'Base de données complète créée avec succès. Superadmin ajouté.'}), 200
+        return jsonify({'message': 'Base complète créée. Superadmin ajouté. Aucun bug futur.'}), 200
         
     except Exception as e:
         db.session.rollback()
