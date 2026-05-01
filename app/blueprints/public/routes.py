@@ -126,9 +126,23 @@ def init_db(secret):
     try:
         db.session.rollback()
         
-        # Création de toutes les tables dans l'ordre (sans FK d'abord)
+        # Suppression de toutes les tables existantes
+        db.session.execute(text("DROP TABLE IF EXISTS reservations CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS salon_categories CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS bookings CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS galerie CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS logs CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS temoignages CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS coiffeurs CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS services CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS users CASCADE"))
+        db.session.execute(text("DROP TABLE IF EXISTS tenants CASCADE"))
+        db.session.commit()
+        
+        # Création de TOUTES les tables avec TOUTES les colonnes
         db.session.execute(text("""
-        CREATE TABLE IF NOT EXISTS tenants (
+        -- Tenants
+        CREATE TABLE tenants (
             id SERIAL PRIMARY KEY,
             slug VARCHAR(50) UNIQUE NOT NULL,
             nom VARCHAR(100) NOT NULL,
@@ -148,8 +162,9 @@ def init_db(secret):
             created_at TIMESTAMP DEFAULT NOW(),
             last_payment_date TIMESTAMP DEFAULT NOW()
         );
-        
-        CREATE TABLE IF NOT EXISTS users (
+
+        -- Users
+        CREATE TABLE users (
             id SERIAL PRIMARY KEY,
             email VARCHAR(120) UNIQUE NOT NULL,
             password_hash VARCHAR(256) NOT NULL,
@@ -157,20 +172,9 @@ def init_db(secret):
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
             created_at TIMESTAMP DEFAULT NOW()
         );
-        
-        CREATE TABLE IF NOT EXISTS coiffeurs (
-            id SERIAL PRIMARY KEY,
-            tenant_slug VARCHAR(50) REFERENCES tenants(slug),
-            nom VARCHAR(100) NOT NULL,
-            photo_cloudinary_id VARCHAR(200),
-            photo_url VARCHAR(500),
-            specialite VARCHAR(200),
-            instagram VARCHAR(100),
-            annees_exp INTEGER,
-            active BOOLEAN DEFAULT TRUE
-        );
-        
-        CREATE TABLE IF NOT EXISTS services (
+
+        -- Services
+        CREATE TABLE services (
             id VARCHAR(36) PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
             categorie VARCHAR(50) DEFAULT 'Autre',
@@ -186,8 +190,22 @@ def init_db(secret):
             description_psycho TEXT,
             prix_barre FLOAT
         );
-        
-        CREATE TABLE IF NOT EXISTS bookings (
+
+        -- Coiffeurs
+        CREATE TABLE coiffeurs (
+            id SERIAL PRIMARY KEY,
+            tenant_slug VARCHAR(50) REFERENCES tenants(slug),
+            nom VARCHAR(100) NOT NULL,
+            photo_cloudinary_id VARCHAR(200),
+            photo_url VARCHAR(500),
+            specialite VARCHAR(200),
+            instagram VARCHAR(100),
+            annees_exp INTEGER,
+            active BOOLEAN DEFAULT TRUE
+        );
+
+        -- Bookings (avec acompte_tx_id)
+        CREATE TABLE bookings (
             id SERIAL PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
             client_nom VARCHAR(100) NOT NULL,
@@ -195,10 +213,12 @@ def init_db(secret):
             service_id VARCHAR(36) REFERENCES services(id),
             coiffeur_id INTEGER REFERENCES coiffeurs(id),
             start_time TIMESTAMP,
-            status VARCHAR(20) DEFAULT 'en_attente'
+            status VARCHAR(20) DEFAULT 'en_attente',
+            acompte_tx_id VARCHAR(200)
         );
-        
-        CREATE TABLE IF NOT EXISTS temoignages (
+
+        -- Temoignages
+        CREATE TABLE temoignages (
             id SERIAL PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
             client_nom VARCHAR(100),
@@ -210,8 +230,9 @@ def init_db(secret):
             approved BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT NOW()
         );
-        
-        CREATE TABLE IF NOT EXISTS galerie (
+
+        -- Galerie
+        CREATE TABLE galerie (
             id SERIAL PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
             photo_cloudinary_id VARCHAR(200) NOT NULL,
@@ -219,23 +240,26 @@ def init_db(secret):
             type VARCHAR(20) DEFAULT 'avant',
             legende VARCHAR(200)
         );
-        
-        CREATE TABLE IF NOT EXISTS logs (
+
+        -- Logs
+        CREATE TABLE logs (
             id SERIAL PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
             event_type VARCHAR(50),
             message TEXT,
             created_at TIMESTAMP DEFAULT NOW()
         );
-        
-        CREATE TABLE IF NOT EXISTS salon_categories (
+
+        -- Salon Categories
+        CREATE TABLE salon_categories (
             id SERIAL PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
             categorie VARCHAR(50) NOT NULL,
             UNIQUE(tenant_slug, categorie)
         );
-        
-        CREATE TABLE IF NOT EXISTS reservations (
+
+        -- Reservations
+        CREATE TABLE reservations (
             id VARCHAR(36) PRIMARY KEY,
             tenant_slug VARCHAR(50) REFERENCES tenants(slug),
             client_nom VARCHAR(100),
@@ -252,13 +276,12 @@ def init_db(secret):
         
         # Créer le superadmin
         from app.models import User
-        if not User.query.filter_by(email='admin@slik.cd').first():
-            u = User(email='admin@slik.cd', role='superadmin')
-            u.set_password('00Kalema')
-            db.session.add(u)
-            db.session.commit()
-            return jsonify({'message': 'Toutes les tables créées, superadmin ajouté'}), 200
-        return jsonify({'message': 'Tables déjà existantes'}), 200
+        u = User(email='admin@slik.cd', role='superadmin')
+        u.set_password('00Kalema')
+        db.session.add(u)
+        db.session.commit()
+        
+        return jsonify({'message': 'Base de données complète créée avec succès. Superadmin ajouté.'}), 200
         
     except Exception as e:
         db.session.rollback()
