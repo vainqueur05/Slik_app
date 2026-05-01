@@ -16,22 +16,13 @@ def init_db(secret):
     if secret != 'mon-code-secret-123':
         return jsonify({'error': 'Accès refusé'}), 403
 
-    # 1. Appliquer les migrations (ne fera rien si déjà fait)
-    try:
-        from flask_migrate import upgrade as _upgrade
-        _upgrade()
-    except Exception as e:
-        # On continue même en cas d'erreur
-        pass
-
-    # 2. Ajouter la colonne "categorie" si elle n'existe pas déjà
     from sqlalchemy import text, inspect
     insp = inspect(db.engine)
+
+    # 1. Ajout des colonnes manquantes
     if 'categorie' not in [c['name'] for c in insp.get_columns('services')]:
         db.session.execute(text("ALTER TABLE services ADD COLUMN categorie VARCHAR(50) DEFAULT 'Autre'"))
         db.session.commit()
-
-    # 3. Ajouter les autres colonnes manquantes (actif, is_preset, etc.)
     for col, coltype, default in [
         ('actif', 'BOOLEAN', 'TRUE'),
         ('is_preset', 'BOOLEAN', 'TRUE'),
@@ -43,6 +34,70 @@ def init_db(secret):
             db.session.execute(text(f"ALTER TABLE services ADD COLUMN {col} {coltype} {default_sql}"))
     db.session.commit()
 
+    # 2. Création des triggers (s'ils n'existent pas)
+    db.session.execute(text("""
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'after_tenant_insert') THEN
+            CREATE OR REPLACE FUNCTION insert_default_categories()
+            RETURNS TRIGGER AS $BODY$
+            BEGIN
+                INSERT INTO salon_categories (tenant_slug, categorie) VALUES
+                    (NEW.slug, 'Coiffure Femme'),
+                    (NEW.slug, 'Coiffure Mariee'),
+                    (NEW.slug, 'Barber'),
+                    (NEW.slug, 'Coiffure Homme'),
+                    (NEW.slug, 'Make-up'),
+                    (NEW.slug, 'Onglerie'),
+                    (NEW.slug, 'Cils/Sourcils'),
+                    (NEW.slug, 'Soins Visage'),
+                    (NEW.slug, 'Autre');
+                RETURN NEW;
+            END;
+            $BODY$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER after_tenant_insert
+            AFTER INSERT ON tenants
+            FOR EACH ROW EXECUTE FUNCTION insert_default_categories();
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'after_category_insert') THEN
+            CREATE OR REPLACE FUNCTION insert_preset_services()
+            RETURNS TRIGGER AS $BODY$
+            BEGIN
+                IF NEW.categorie = 'Coiffure Femme' THEN
+                    INSERT INTO services (id, tenant_slug, categorie, nom, prix, duree, is_preset, actif) VALUES
+                        (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Pose perruque', '15$', '1h', TRUE, TRUE),
+                        (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Tissage lace', '20$', '2h', TRUE, TRUE),
+                        (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Tissage closure', '20$', '2h', TRUE, TRUE),
+                        (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Brushing', '10$', '45min', TRUE, TRUE),
+                        (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Box Braids Longues', '35$', '4h', TRUE, TRUE),
+                        (gen_random_uuid(), NEW.tenant_slug, 'Coiffure Femme', 'Fulani Braids', '40$', '5h', TRUE, TRUE);
+                END IF;
+                -- (ajoute les autres catégories ici, comme dans le script SQL précédent)
+                RETURN NEW;
+            END;
+            $BODY$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER after_category_insert
+            AFTER INSERT ON salon_categories
+            FOR EACH ROW EXECUTE FUNCTION insert_preset_services();
+        END IF;
+    END;
+    $$;
+    """))
+    db.session.commit()
+
+    # 3. Peupler les catégories pour les salons existants
+    from app.models import Tenant, SalonCategory
+    categories_list = ['Coiffure Femme', 'Coiffure Mariee', 'Barber', 'Coiffure Homme', 'Make-up', 'Onglerie', 'Cils/Sourcils', 'Soins Visage', 'Autre']
+    for tenant in Tenant.query.all():
+        existing = [c.categorie for c in SalonCategory.query.filter_by(tenant_slug=tenant.slug).all()]
+        for cat in categories_list:
+            if cat not in existing:
+                db.session.add(SalonCategory(tenant_slug=tenant.slug, categorie=cat))
+    db.session.commit()
+
     # 4. Créer le superadmin si absent
     from app.models import User
     if not User.query.filter_by(email='admin@slik.cd').first():
@@ -50,7 +105,7 @@ def init_db(secret):
         u.set_password('00Kalema')
         db.session.add(u)
         db.session.commit()
-        return jsonify({'message': 'Base prête et superadmin créé'}), 200
+        return jsonify({'message': 'Base prête, triggers créés, superadmin ajouté'}), 200
     return jsonify({'message': 'Base déjà prête'}), 200
 
 @public_bp.route('/<slug>')
