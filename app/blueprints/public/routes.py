@@ -19,45 +19,28 @@ def init_db(secret):
     import subprocess, sys
     from sqlalchemy import text, inspect
 
-    # --- 0. Pré‑correction de la contrainte qui bloque la migration ---
-    # Supprimer la contrainte existante, puis altérer les colonnes si nécessaire
+    # 0. Créer la table salon_categories si elle n'existe pas encore (pour éviter l'erreur de trigger)
     try:
-        db.session.execute(text("ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_service_id_fkey"))
+        db.session.execute(text("""
+        CREATE TABLE IF NOT EXISTS salon_categories (
+            id SERIAL PRIMARY KEY,
+            tenant_slug VARCHAR(50) NOT NULL REFERENCES tenants(slug) ON DELETE CASCADE,
+            categorie VARCHAR(50) NOT NULL,
+            UNIQUE(tenant_slug, categorie)
+        );
+        """))
         db.session.commit()
-        # Maintenant on peut lancer la migration qui va convertir service_id en VARCHAR
     except Exception as e:
-        # La contrainte n’existait peut‑être pas, on continue
-        pass
+        pass  # déjà existante
 
-    # --- 1. Appliquer toutes les migrations Flask ---
+    # 1. Appliquer toutes les migrations Flask
     result = subprocess.run(
         [sys.executable, '-m', 'flask', 'db', 'upgrade'],
         capture_output=True, text=True, cwd='/app'
     )
-    # On ne bloque pas en cas d’erreur inoffensive, on affiche juste l’info
     migration_output = result.stdout + '\n' + result.stderr
 
-    # --- 2. Recréer la contrainte de clé étrangère manuellement (si besoin) ---
-    try:
-        # Vérifier si la colonne bookings.service_id est bien VARCHAR maintenant
-        db.session.execute(text("""
-        DO $$
-        BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM information_schema.table_constraints
-                WHERE constraint_name='bookings_service_id_fkey'
-            ) THEN
-                ALTER TABLE bookings ADD CONSTRAINT bookings_service_id_fkey
-                FOREIGN KEY (service_id) REFERENCES services(id);
-            END IF;
-        END;
-        $$;
-        """))
-        db.session.commit()
-    except Exception as e:
-        pass
-
-    # --- 3. Recréer les triggers ---
+    # 2. Recréer les triggers (ils utiliseront les tables déjà existantes)
     try:
         # Fonction insert_default_categories
         db.session.execute(text("""
@@ -152,7 +135,7 @@ def init_db(secret):
     except Exception as e:
         return jsonify({'error': 'Erreur lors de la création des triggers', 'details': str(e)}), 500
 
-    # --- 4. Peupler les salons existants ---
+    # 3. Peupler les salons existants
     from app.models import Tenant, SalonCategory
     categories_list = ['Coiffure Femme', 'Coiffure Mariee', 'Barber', 'Coiffure Homme', 'Make-up', 'Onglerie', 'Cils/Sourcils', 'Soins Visage', 'Autre']
     for tenant in Tenant.query.all():
@@ -162,7 +145,7 @@ def init_db(secret):
                 db.session.add(SalonCategory(tenant_slug=tenant.slug, categorie=cat))
     db.session.commit()
 
-    # --- 5. Superadmin (si absent) ---
+    # 4. Superadmin (si absent)
     from app.models import User
     if not User.query.filter_by(email='admin@slik.cd').first():
         u = User(email='admin@slik.cd', role='superadmin')
