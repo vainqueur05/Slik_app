@@ -1,0 +1,27 @@
+<section id="faq" class="py-20 bg-black">
+    <div class="max-w-4xl mx-auto px-4">
+        <h2 class="font-dream text-4xl text-center mb-12 text-white">Questions Fréquentes</h2>
+        <div x-data="{open: null}" class="space-y-2">
+            <div class="border-b border-zinc-800 py-4">
+                <button @click="open = open===1 ? null : 1" class="font-inter w-full text-left text-lg text-white">Prenez-vous sans RDV ?</button>
+                <div x-show="open===1" class="text-gray-400 mt-2">Oui selon disponibilité, mais la réservation est recommandée.</div>
+            </div>
+            <div class="border-b border-zinc-800 py-4">
+                <button @click="open = open===2 ? null : 2" class="font-inter w-full text-left text-lg text-white">Prix négociables ?</button>
+                <div x-show="open===2" class="text-gray-400 mt-2">Les prix affichés sont de base. Remise possible sur les forfaits.</div>
+            </div>
+            <div class="border-b border-zinc-800 py-4">
+                <button @click="open = open===3 ? null : 3" class="font-inter w-full text-left text-lg text-white">Service à domicile ?</button>
+                <div x-show="open===3" class="text-gray-400 mt-2">Oui pour les mariées. Frais de déplacement selon la zone.</div>
+            </div>
+            <div class="border-b border-zinc-800 py-4">
+                <button @click="open = open===4 ? null : 4" class="font-inter w-full text-left text-lg text-white">Quels produits utilisez-vous ?</button>
+                <div x-show="open===4" class="text-gray-400 mt-2">Produits professionnels L'Oréal et Schwarzkopf principalement.</div>
+            </div>
+            <div class="border-b border-zinc-800 py-4">
+                <button @click="open = open===5 ? null : 5" class="font-inter w-full text-left text-lg text-white">Comment annuler ?</button>
+                <div x-show="open===5" class="text-gray-400 mt-2">Prévenez 24h à l'avance sur WhatsApp.</div>
+            </div>
+        </div>
+    </div>
+</section>

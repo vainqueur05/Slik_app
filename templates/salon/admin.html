@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Console Admin · {{ tenant.nom }}</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+    
+    <style>
+        :root {
+            --gold: #D4AF37;
+            --gold-soft: rgba(212, 175, 55, 0.1);
+            --gold-border: rgba(212, 175, 55, 0.25);
+            --bg-deep: #050505;
+            --bg-card: #0d0d0d;
+            --bg-elevated: #141414;
+            --border: rgba(255, 255, 255, 0.06);
+            --border-hover: rgba(212, 175, 55, 0.3);
+            --text-soft: #a1a1aa;
+        }
+        
+        * { -webkit-tap-highlight-color: transparent; }
+        ::selection { background: var(--gold); color: #000; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-deep); }
+        ::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 10px; opacity: 0.5; }
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--bg-deep);
+            color: white;
+        }
+        h1, h2, h3, .font-serif { font-family: 'Cormorant Garamond', serif; }
+        .font-mono { font-family: 'Space Grotesk', monospace; letter-spacing: 0.5px; }
+        
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            background: linear-gradient(180deg, var(--bg-card), var(--bg-deep));
+            border-right: 1px solid var(--border);
+        }
+        
+        .nav-link {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px; border-radius: 12px;
+            color: var(--text-soft); font-weight: 500;
+            transition: all 0.3s; position: relative;
+            font-size: 0.92rem;
+        }
+        .nav-link:hover {
+            background: rgba(255,255,255,0.04);
+            color: white;
+            transform: translateX(2px);
+        }
+        .nav-link.active {
+            background: linear-gradient(135deg, var(--gold-soft), transparent);
+            color: var(--gold);
+            border: 1px solid var(--gold-border);
+        }
+        .nav-link.active::before {
+            content: ''; position: absolute;
+            left: -1px; top: 20%; bottom: 20%;
+            width: 3px; background: var(--gold);
+            border-radius: 0 4px 4px 0;
+        }
+        .nav-link i { font-size: 1.1rem; width: 20px; }
+        
+        .nav-section-title {
+            font-size: 0.7rem; text-transform: uppercase;
+            letter-spacing: 2px; color: rgba(255,255,255,0.3);
+            font-weight: 700; margin: 24px 16px 8px;
+        }
+        
+        /* ===== STATUS PILL ===== */
+        .status-pill {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 5px 12px; border-radius: 100px;
+            font-size: 0.75rem; font-weight: 600;
+        }
+        .status-online {
+            background: rgba(34, 197, 94, 0.1);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+        .status-online .dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 10px #22c55e;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        
+        /* ===== HEADER ===== */
+        .page-header {
+            display: flex; justify-content: space-between;
+            align-items: flex-start; flex-wrap: wrap; gap: 20px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 32px;
+        }
+        
+        .greeting {
+            font-size: 0.85rem; color: var(--text-soft);
+            margin-bottom: 4px;
+            font-family: 'Space Grotesk';
+        }
+        
+        /* ===== STAT CARDS ===== */
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 18px; padding: 24px;
+            transition: all 0.4s;
+            position: relative; overflow: hidden;
+        }
+        .stat-card::before {
+            content: ''; position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+            opacity: 0; transition: opacity 0.4s;
+        }
+        .stat-card:hover { 
+            border-color: var(--border-hover);
+            transform: translateY(-3px);
+        }
+        .stat-card:hover::before { opacity: 1; }
+        
+        .stat-icon-wrap {
+            width: 44px; height: 44px;
+            background: var(--gold-soft);
+            border: 1px solid var(--gold-border);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--gold); font-size: 1.2rem;
+            margin-bottom: 16px;
+        }
+        
+        .stat-number {
+            font-size: 2.2rem; font-weight: 900;
+            font-family: 'Cormorant Garamond';
+            line-height: 1; color: white;
+        }
+        .stat-label {
+            font-size: 0.7rem; text-transform: uppercase;
+            letter-spacing: 2px; color: var(--text-soft);
+            margin-top: 6px; font-weight: 600;
+        }
+        .stat-trend {
+            font-size: 0.75rem; margin-top: 8px;
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 3px 8px; border-radius: 6px;
+            background: rgba(34, 197, 94, 0.1);
+            color: #22c55e; font-weight: 600;
+        }
+        
+        /* ===== MEDIA CARD ===== */
+        .media-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px; padding: 24px;
+            transition: all 0.4s;
+            height: 100%;
+        }
+        .media-card:hover { border-color: var(--border-hover); }
+        
+        .media-card-header {
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 20px;
+        }
+        .media-card-title {
+            font-size: 1rem; font-weight: 700;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .media-card-title i {
+            width: 32px; height: 32px;
+            background: var(--gold-soft);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--gold); font-size: 0.95rem;
+        }
+        
+        .media-preview {
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            margin-bottom: 16px;
+            background: var(--bg-elevated);
+            position: relative;
+        }
+        .media-preview img, .media-preview video {
+            width: 100%; height: 140px;
+            object-fit: cover; display: block;
+        }
+        .media-preview-empty {
+            height: 140px; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+            color: rgba(255,255,255,0.3);
+        }
+        .media-preview-empty i { font-size: 2rem; margin-bottom: 8px; }
+        .media-preview-empty p { font-size: 0.85rem; }
+        
+        .has-media-badge {
+            position: absolute; top: 10px; right: 10px;
+            background: rgba(34, 197, 94, 0.9);
+            color: white; padding: 4px 10px;
+            border-radius: 100px; font-size: 0.7rem;
+            font-weight: 600; backdrop-filter: blur(10px);
+        }
+        
+        /* ===== DROPZONE ===== */
+        .dropzone-modern {
+            border: 1.5px dashed var(--border);
+            border-radius: 14px; padding: 24px 16px;
+            text-align: center; cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(255,255,255,0.02);
+        }
+        .dropzone-modern:hover, .dropzone-modern.drag-active {
+            border-color: var(--gold);
+            background: var(--gold-soft);
+            transform: scale(1.01);
+        }
+        .dropzone-modern i {
+            font-size: 1.8rem; color: var(--text-soft);
+            transition: color 0.3s;
+        }
+        .dropzone-modern:hover i { color: var(--gold); }
+        
+        .btn-gold {
+            background: linear-gradient(135deg, var(--gold), #b8941f);
+            color: #000; font-weight: 700;
+            padding: 8px 18px; border-radius: 100px;
+            font-size: 0.85rem; border: none;
+            transition: all 0.3s;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .btn-gold:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(212, 175, 55, 0.3);
+        }
+        
+        .progress-modern {
+            height: 4px; background: rgba(255,255,255,0.05);
+            border-radius: 100px; overflow: hidden;
+        }
+        .progress-modern .fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--gold), #f5d04a);
+            border-radius: 100px;
+            transition: width 0.3s ease;
+        }
+        
+        /* ===== QUICK CARDS ===== */
+        .quick-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px; padding: 24px;
+            transition: all 0.4s;
+            text-decoration: none; color: inherit;
+            display: block; height: 100%;
+            position: relative; overflow: hidden;
+        }
+        .quick-card::before {
+            content: ''; position: absolute; inset: 0;
+            background: radial-gradient(400px at var(--mx, 50%) var(--my, 50%), var(--gold-soft), transparent 50%);
+            opacity: 0; transition: opacity 0.4s;
+            pointer-events: none;
+        }
+        .quick-card:hover::before { opacity: 1; }
+        .quick-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+        
+        .quick-icon {
+            width: 50px; height: 50px;
+            background: linear-gradient(135deg, var(--gold-soft), transparent);
+            border: 1px solid var(--gold-border);
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--gold); font-size: 1.4rem;
+            margin-bottom: 16px;
+            transition: all 0.4s;
+        }
+        .quick-card:hover .quick-icon {
+            background: linear-gradient(135deg, var(--gold), #b8941f);
+            color: #000;
+            transform: rotate(-8deg) scale(1.05);
+        }
+        
+        .quick-arrow {
+            position: absolute; top: 24px; right: 24px;
+            color: rgba(255,255,255,0.2);
+            transition: all 0.4s;
+        }
+        .quick-card:hover .quick-arrow {
+            color: var(--gold);
+            transform: translate(4px, -4px);
+        }
+        
+        .quick-count {
+            font-family: 'Cormorant Garamond';
+            font-size: 1.6rem; font-weight: 700;
+            color: var(--gold); line-height: 1;
+        }
+        
+        /* ===== SECTION TITLE ===== */
+        .section-title {
+            font-size: 1.3rem; font-weight: 700;
+            margin-bottom: 20px;
+            display: flex; align-items: center; gap: 12px;
+        }
+        .section-title-line {
+            flex: 1; height: 1px;
+            background: linear-gradient(90deg, var(--border), transparent);
+        }
+        
+        /* ===== TOAST ===== */
+        .toast { 
+            position: fixed; top: 20px; right: 20px; 
+            z-index: 9999; transition: all 0.3s ease;
+            background: var(--bg-card);
+            border: 1px solid var(--gold-border);
+            border-radius: 14px;
+            padding: 14px 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            transform: translateX(120%);
+        }
+        .toast.show { transform: translateX(0); }
+        
+        /* ===== MOBILE ===== */
+        @media (max-width: 768px) {
+            .sidebar { 
+                position: fixed; left: -100%; top: 0; bottom: 0;
+                z-index: 100; transition: left 0.3s;
+                width: 80%; max-width: 300px;
+            }
+            .sidebar.open { left: 0; }
+            .menu-toggle { display: flex !important; }
+        }
+        
+        .menu-toggle {
+            display: none;
+            width: 42px; height: 42px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: white; align-items: center; justify-content: center;
+        }
+    </style>
+</head>
+<body class="flex min-h-screen">
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar w-64 p-5 flex-shrink-0">
+        <!-- Logo Brand -->
+        <div class="mb-8 pb-5" style="border-bottom: 1px solid var(--border);">
+            <div class="flex items-center gap-3">
+                {% if tenant.logo_url %}
+                <img src="{{ tenant.logo_url }}" class="w-12 h-12 rounded-xl object-cover" style="border: 2px solid var(--gold);">
+                {% else %}
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center font-serif text-xl font-bold" 
+                     style="background: linear-gradient(135deg, var(--gold), #b8941f); color: #000;">
+                    {{ tenant.nom[0]|upper }}
+                </div>
+                {% endif %}
+                <div>
+                    <h2 class="font-serif text-xl font-bold leading-tight" style="color: var(--gold);">{{ tenant.nom }}</h2>
+                    <span class="status-pill status-online mt-1"><span class="dot"></span>En ligne</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Navigation principale -->
+        <nav class="space-y-1">
+            <p class="nav-section-title">Pilotage</p>
+            <a href="/salon/{{ tenant.slug }}/admin" class="nav-link active">
+                <i class="bi bi-grid-fill"></i> Tableau de bord
+            </a>
+            <a href="/salon/{{ tenant.slug }}/admin/reservations" class="nav-link">
+                <i class="bi bi-calendar-check"></i> Réservations
+                {% if counts.reservations %}
+                <span class="ml-auto text-xs px-2 py-0.5 rounded-full" style="background: var(--gold-soft); color: var(--gold);">{{ counts.reservations }}</span>
+                {% endif %}
+            </a>
+            
+            <p class="nav-section-title">Contenu</p>
+            <a href="/salon/{{ tenant.slug }}/admin/services" class="nav-link">
+                <i class="bi bi-scissors"></i> Services
+            </a>
+            <a href="/salon/{{ tenant.slug }}/admin/coiffeurs" class="nav-link">
+                <i class="bi bi-people"></i> Équipe
+            </a>
+            <a href="/salon/{{ tenant.slug }}/admin/galerie" class="nav-link">
+                <i class="bi bi-images"></i> Galerie
+            </a>
+            <a href="/salon/{{ tenant.slug }}/admin/temoignages" class="nav-link">
+                <i class="bi bi-star"></i> Avis clients
+            </a>
+            
+            <p class="nav-section-title">Configuration</p>
+            <a href="/salon/{{ tenant.slug }}/admin/theme" class="nav-link">
+                <i class="bi bi-palette"></i> Thème
+            </a>
+            <a href="/salon/{{ tenant.slug }}/admin/map" class="nav-link">
+                <i class="bi bi-geo-alt"></i> Localisation
+            </a>
+            
+            <div class="pt-6 mt-6" style="border-top: 1px solid var(--border);">
+                <a href="/salon/{{ tenant.slug }}" target="_blank" class="nav-link">
+                    <i class="bi bi-box-arrow-up-right"></i> Voir mon site
+                </a>
+                <a href="/logout" class="nav-link" style="color: #ef4444;">
+                    <i class="bi bi-box-arrow-left"></i> Déconnexion
+                </a>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- ===== MAIN ===== -->
+    <main class="flex-1 p-6 lg:p-8">
+        
+        <!-- Header -->
+        <div class="page-header">
+            <div>
+                <p class="greeting">{{ greeting|default('Bonjour') }} 👋</p>
+                <h1 class="text-3xl lg:text-4xl font-bold">Tableau de bord</h1>
+                <p class="text-sm mt-1" style="color: var(--text-soft);">
+                    Voici un résumé de votre activité aujourd'hui.
+                </p>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="/salon/{{ tenant.slug }}" target="_blank" class="btn-gold">
+                    <i class="bi bi-eye"></i> Aperçu live
+                </a>
+            </div>
+        </div>
+
+        <!-- ===== STATS RAPIDES ===== -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="stat-card">
+                <div class="stat-icon-wrap">
+                    <i class="bi bi-calendar-check"></i>
+                </div>
+                <div class="stat-number">{{ counts.bookings }}</div>
+                <div class="stat-label">Réservations</div>
+                <div class="stat-trend">
+                    <i class="bi bi-arrow-up text-xs"></i> Live
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon-wrap" style="background: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.2); color: #8b5cf6;">
+                    <i class="bi bi-scissors"></i>
+                </div>
+                <div class="stat-number">{{ counts.services }}</div>
+                <div class="stat-label">Services actifs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon-wrap" style="background: rgba(0, 240, 255, 0.1); border-color: rgba(0, 240, 255, 0.2); color: #00f0ff;">
+                    <i class="bi bi-people"></i>
+                </div>
+                <div class="stat-number">{{ counts.coiffeurs }}</div>
+                <div class="stat-label">Coiffeurs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon-wrap" style="background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2); color: #f59e0b;">
+                    <i class="bi bi-star-fill"></i>
+                </div>
+                <div class="stat-number">{{ counts.temoignages }}</div>
+                <div class="stat-label">Avis clients</div>
+            </div>
+        </div>
+
+        <!-- ===== MÉDIAS DU SALON ===== -->
+        <div class="section-title">
+            <i class="bi bi-camera-fill" style="color: var(--gold);"></i>
+            <span>Identité visuelle</span>
+            <div class="section-title-line"></div>
+            <span class="text-xs font-normal" style="color: var(--text-soft);">
+                Format JPG/PNG · Max 5MB
+            </span>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-10">
+            <!-- LOGO -->
+            <div class="media-card">
+                <div class="media-card-header">
+                    <div class="media-card-title">
+                        <i class="bi bi-image"></i>
+                        <span>Logo</span>
+                    </div>
+                    {% if tenant.logo_url %}
+                    <span class="status-pill status-online"><span class="dot"></span>Configuré</span>
+                    {% endif %}
+                </div>
+                
+                <div id="logo-preview" class="media-preview">
+                    {% if tenant.logo_url %}
+                    <img src="{{ tenant.logo_url }}" alt="Logo">
+                    <span class="has-media-badge">✓ Live</span>
+                    {% else %}
+                    <div class="media-preview-empty">
+                        <i class="bi bi-image"></i>
+                        <p>Aucun logo</p>
+                    </div>
+                    {% endif %}
+                </div>
+                <div id="logo-upload-container"></div>
+            </div>
+
+            <!-- VIDEO HERO -->
+            <div class="media-card">
+                <div class="media-card-header">
+                    <div class="media-card-title">
+                        <i class="bi bi-film"></i>
+                        <span>Vidéo Hero</span>
+                    </div>
+                    {% if tenant.video_url %}
+                    <span class="status-pill status-online"><span class="dot"></span>Configuré</span>
+                    {% endif %}
+                </div>
+                
+                <div id="video-preview" class="media-preview">
+                    {% if tenant.video_url %}
+                    <video src="{{ tenant.video_url }}" muted autoplay loop></video>
+                    <span class="has-media-badge">✓ Live</span>
+                    {% else %}
+                    <div class="media-preview-empty">
+                        <i class="bi bi-film"></i>
+                        <p>Aucune vidéo</p>
+                    </div>
+                    {% endif %}
+                </div>
+                <div id="video-upload-container"></div>
+            </div>
+
+            <!-- COVER -->
+            <div class="media-card">
+                <div class="media-card-header">
+                    <div class="media-card-title">
+                        <i class="bi bi-image-alt"></i>
+                        <span>Couverture</span>
+                    </div>
+                    {% if tenant.cover_url %}
+                    <span class="status-pill status-online"><span class="dot"></span>Configuré</span>
+                    {% endif %}
+                </div>
+                
+                <div id="cover-preview" class="media-preview">
+                    {% if tenant.cover_url %}
+                    <img src="{{ tenant.cover_url }}" alt="Couverture">
+                    <span class="has-media-badge">✓ Live</span>
+                    {% else %}
+                    <div class="media-preview-empty">
+                        <i class="bi bi-image"></i>
+                        <p>Aucune couverture</p>
+                    </div>
+                    {% endif %}
+                </div>
+                <div id="cover-upload-container"></div>
+            </div>
+        </div>
+
+        <!-- ===== ACCÈS RAPIDES ===== -->
+        <div class="section-title">
+            <i class="bi bi-grid" style="color: var(--gold);"></i>
+            <span>Gestion rapide</span>
+            <div class="section-title-line"></div>
+        </div>
+        
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-10">
+            <a href="/salon/{{ tenant.slug }}/admin/services" class="quick-card">
+                <i class="bi bi-arrow-up-right quick-arrow"></i>
+                <div class="quick-icon"><i class="bi bi-scissors"></i></div>
+                <h4 class="font-bold text-sm mb-1">Services</h4>
+                <span class="quick-count">{{ counts.services }}</span>
+            </a>
+            <a href="/salon/{{ tenant.slug }}/admin/coiffeurs" class="quick-card">
+                <i class="bi bi-arrow-up-right quick-arrow"></i>
+                <div class="quick-icon"><i class="bi bi-people"></i></div>
+                <h4 class="font-bold text-sm mb-1">Équipe</h4>
+                <span class="quick-count">{{ counts.coiffeurs }}</span>
+            </a>
+            <a href="/salon/{{ tenant.slug }}/admin/bookings" class="quick-card">
+                <i class="bi bi-arrow-up-right quick-arrow"></i>
+                <div class="quick-icon"><i class="bi bi-calendar-check"></i></div>
+                <h4 class="font-bold text-sm mb-1">RDV</h4>
+                <span class="quick-count">{{ counts.bookings }}</span>
+            </a>
+            <a href="/salon/{{ tenant.slug }}/admin/galerie" class="quick-card">
+                <i class="bi bi-arrow-up-right quick-arrow"></i>
+                <div class="quick-icon"><i class="bi bi-images"></i></div>
+                <h4 class="font-bold text-sm mb-1">Galerie</h4>
+                <span class="quick-count">{{ counts.galerie }}</span>
+            </a>
+            <a href="/salon/{{ tenant.slug }}/admin/temoignages" class="quick-card">
+                <i class="bi bi-arrow-up-right quick-arrow"></i>
+                <div class="quick-icon"><i class="bi bi-star"></i></div>
+                <h4 class="font-bold text-sm mb-1">Avis</h4>
+                <span class="quick-count">{{ counts.temoignages }}</span>
+            </a>
+            <a href="/salon/{{ tenant.slug }}/admin/map" class="quick-card">
+                <i class="bi bi-arrow-up-right quick-arrow"></i>
+                <div class="quick-icon"><i class="bi bi-geo-alt"></i></div>
+                <h4 class="font-bold text-sm mb-1">Carte</h4>
+                <span class="text-xs" style="color: var(--text-soft);">Position GPS</span>
+            </a>
+        </div>
+
+        <!-- ===== TIPS PREMIUM ===== -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
+            <div class="quick-card" style="background: linear-gradient(135deg, var(--gold-soft), transparent);">
+                <div class="flex items-start gap-4">
+                    <div class="quick-icon" style="flex-shrink: 0;">
+                        <i class="bi bi-lightbulb-fill"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold mb-2">💡 Astuce du jour</h4>
+                        <p class="text-sm" style="color: var(--text-soft);">
+                            Les salons avec une <strong style="color: var(--gold);">vidéo hero</strong> 
+                            convertissent <strong style="color: var(--gold);">3x plus</strong> que ceux sans.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="quick-card">
+                <div class="flex items-start gap-4">
+                    <div class="quick-icon" style="background: rgba(220, 38, 38, 0.1); border-color: rgba(220, 38, 38, 0.2); color: #ef4444; flex-shrink: 0;">
+                        <i class="bi bi-shield-check"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold mb-2">🔐 Sauvegarde auto</h4>
+                        <p class="text-sm" style="color: var(--text-soft);">
+                            Toutes vos données sont sauvegardées en temps réel sur Cloudinary.
+                            Vous ne perdez jamais rien.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="toast" class="toast"></div>
+
+    <!-- ===== UPLOAD SCRIPT ===== -->
+    <script>
+        const CLOUD_NAME = 'dnns2lagp';
+        const UPLOAD_PRESET = 'slik_unsigned';
+
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            const color = type === 'success' ? '#22c55e' : '#ef4444';
+            toast.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <i class="bi bi-${type === 'success' ? 'check-circle' : 'x-circle'}-fill" style="color: ${color};"></i>
+                    <span class="text-sm font-medium">${msg}</span>
+                </div>
+            `;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3500);
+        }
+
+        function createUploader(containerId, previewId, saveUrl, saveField, accept) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = `
+                <input type="file" id="${containerId}-file" accept="${accept}" class="hidden" />
+                <div class="dropzone-modern" id="${containerId}-dropzone">
+                    <i class="bi bi-cloud-upload"></i>
+                    <p class="text-sm mt-2 mb-2" style="color: var(--text-soft);">Glissez ou cliquez pour ajouter</p>
+                    <button type="button" class="btn-gold">
+                        <i class="bi bi-folder2-open"></i> Choisir
+                    </button>
+                </div>
+                <div id="${containerId}-progress" class="mt-3 hidden">
+                    <div class="progress-modern">
+                        <div id="${containerId}-bar" class="fill" style="width:0%"></div>
+                    </div>
+                    <p id="${containerId}-percent" class="text-xs mt-1.5 font-mono" style="color: var(--gold);">0%</p>
+                </div>
+                <p id="${containerId}-error" class="text-xs mt-2" style="color: #ef4444;"></p>
+            `;
+
+            const fileInput = document.getElementById(`${containerId}-file`);
+            const dropzone = document.getElementById(`${containerId}-dropzone`);
+            const progressDiv = document.getElementById(`${containerId}-progress`);
+            const bar = document.getElementById(`${containerId}-bar`);
+            const percentText = document.getElementById(`${containerId}-percent`);
+            const errorText = document.getElementById(`${containerId}-error`);
+
+            dropzone.addEventListener('click', () => fileInput.click());
+            dropzone.addEventListener('dragover', e => { 
+                e.preventDefault(); 
+                dropzone.classList.add('drag-active'); 
+            });
+            dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-active'));
+            dropzone.addEventListener('drop', e => {
+                e.preventDefault();
+                dropzone.classList.remove('drag-active');
+                handleFile(e.dataTransfer.files[0]);
+            });
+            fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+            function handleFile(file) {
+                if (!file) return;
+                const allowed = accept.split(',').map(s => s.trim());
+                if (!allowed.includes(file.type)) {
+                    errorText.textContent = '⚠️ Format non supporté. Accepté : ' + accept;
+                    return;
+                }
+                if (file.size > 50 * 1024 * 1024) {
+                    errorText.textContent = '⚠️ Fichier trop lourd (max 50MB)';
+                    return;
+                }
+                
+                progressDiv.classList.remove('hidden');
+                errorText.textContent = '';
+                uploadFile(file);
+            }
+
+            function uploadFile(file) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', UPLOAD_PRESET);
+
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`);
+
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        bar.style.width = percent + '%';
+                        percentText.textContent = percent + '% — Upload en cours...';
+                    }
+                };
+
+                xhr.onload = () => {
+                    if (xhr.status === 200) {
+                        const res = JSON.parse(xhr.responseText);
+                        const url = res.secure_url || res.url;
+                        const cloudinaryId = res.public_id;
+                        
+                        progressDiv.classList.add('hidden');
+                        bar.style.width = '0%';
+                        showToast('Upload réussi ! Sauvegarde en cours...');
+                        
+                        // Update preview
+                        const previewContainer = document.getElementById(previewId);
+                        if (previewContainer) {
+                            const isVideo = file.type.startsWith('video/');
+                            previewContainer.innerHTML = `
+                                ${isVideo 
+                                    ? `<video src="${url}" muted autoplay loop></video>` 
+                                    : `<img src="${url}" alt="Preview">`
+                                }
+                                <span class="has-media-badge">✓ Live</span>
+                            `;
+                        }
+                        
+                        // Save to backend
+                        fetch(saveUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: 'cloudinary_id=' + encodeURIComponent(cloudinaryId) + '&' + saveField + '=' + encodeURIComponent(url)
+                        }).then(() => {
+                            showToast('✨ Sauvegardé avec succès');
+                        });
+                    } else {
+                        errorText.textContent = '❌ Erreur Cloudinary. Réessayez.';
+                        progressDiv.classList.add('hidden');
+                    }
+                };
+
+                xhr.onerror = () => {
+                    errorText.textContent = '❌ Erreur réseau';
+                    progressDiv.classList.add('hidden');
+                };
+
+                xhr.send(formData);
+            }
+        }
+
+        // Init
+        createUploader('logo-upload-container', 'logo-preview', '/salon/{{ tenant.slug }}/admin/update-logo', 'logo_url', 'image/jpeg,image/png,image/webp');
+        createUploader('video-upload-container', 'video-preview', '/salon/{{ tenant.slug }}/admin/update-video', 'video_url', 'video/mp4,video/webm');
+        createUploader('cover-upload-container', 'cover-preview', '/salon/{{ tenant.slug }}/admin/update-cover', 'cover_url', 'image/jpeg,image/png,image/webp');
+
+        // Spotlight effect
+        document.querySelectorAll('.quick-card').forEach(card => {
+            card.addEventListener('mousemove', (e) => {
+                const rect = card.getBoundingClientRect();
+                card.style.setProperty('--mx', (e.clientX - rect.left) + 'px');
+                card.style.setProperty('--my', (e.clientY - rect.top) + 'px');
+            });
+        });
+    </script>
+</body>
+</html>

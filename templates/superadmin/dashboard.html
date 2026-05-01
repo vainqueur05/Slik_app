@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperAdmin - SLIK</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #000; }
+        h1, h2 { font-family: 'Montserrat', sans-serif; }
+        .voyant { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .voyant-vert { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+        .voyant-orange { background: #f97316; box-shadow: 0 0 8px #f97316; }
+        .voyant-rouge { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+    </style>
+</head>
+<body class="text-white">
+    <header class="bg-[#0a0a0a] border-b border-gray-800 px-6 py-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-[#D4AF37]">SLIK SuperAdmin</h1>
+        <div class="flex items-center gap-4">
+            <a href="/superadmin/tenant/create" class="bg-[#D4AF37] text-black px-4 py-2 rounded-full font-bold hover:bg-yellow-500 transition text-sm">+ Nouveau salon</a>
+            <a href="/logout" class="text-red-400 hover:underline text-sm">Déconnexion</a>
+        </div>
+    </header>
+
+    <main class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {% for tenant in tenants %}
+            <div class="bg-[#111] border border-gray-800 rounded-xl p-6 hover:border-[#D4AF37] transition relative">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h2 class="text-xl font-bold">{{ tenant.nom }}</h2>
+                        <p class="text-sm text-gray-400">{{ tenant.ville }}</p>
+                        <p class="text-xs text-gray-600 font-mono">{{ tenant.slug }}</p>
+                    </div>
+                    <!-- Voyant LOI 13 -->
+                    <span class="voyant voyant-{{ tenant.voyant }}" title="{{ tenant.voyant | capitalize }}"></span>
+                </div>
+                <div class="text-sm text-gray-300 space-y-1 mb-4">
+                    <p>Créé le : {{ tenant.created_at }}</p>
+                    <p>Paiement : {{ tenant.last_payment }}</p>
+                </div>
+                <div class="flex gap-2 text-xs">
+                    <button 
+                        hx-get="/superadmin/logs/{{ tenant.id }}" 
+                        hx-target="#log-modal-content" 
+                        hx-trigger="click"
+                        onclick="document.getElementById('log-modal').classList.remove('hidden')"
+                        class="text-[#D4AF37] underline hover:text-yellow-500">
+                        📋 Logs
+                    </button>
+                    <form method="POST" action="/superadmin/tenant/toggle/{{ tenant.id }}" class="inline">
+                        <button type="submit" class="text-{{ 'red' if tenant.active else 'green' }}-400 underline">
+                            {{ 'Suspendre' if tenant.active else 'Activer' }}
+                        </button>
+                    </form>
+                    <form method="POST" action="/superadmin/tenant/extend/{{ tenant.id }}" class="inline">
+                        <button type="submit" class="text-blue-400 underline">+30j</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </main>
+
+    <!-- MODAL LOGS HTMX -->
+    <div id="log-modal" class="hidden fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50" onclick="if(event.target===this) this.classList.add('hidden')">
+        <div class="bg-[#111] p-6 rounded-xl max-w-lg w-full mx-4 border border-[#D4AF37]">
+            <h3 class="text-xl font-bold mb-4 text-[#D4AF37]">Derniers événements</h3>
+            <div id="log-modal-content" class="text-sm space-y-2 max-h-64 overflow-y-auto">
+                <p class="text-gray-500">Chargement...</p>
+            </div>
+            <button onclick="document.getElementById('log-modal').classList.add('hidden')" 
+                    class="mt-4 bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-600">Fermer</button>
+        </div>
+    </div>
+</body>
+</html>

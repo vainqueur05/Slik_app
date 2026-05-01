@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avis - {{ tenant.nom }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2 { font-family: 'Montserrat', sans-serif; }
+    </style>
+</head>
+<body class="bg-black text-white flex min-h-screen">
+
+    <!-- Sidebar Admin -->
+    <aside class="w-64 bg-[#0a0a0a] border-r border-gray-800 p-6 flex-shrink-0">
+        <h2 class="text-2xl font-bold text-[#D4AF37] mb-8">{{ tenant.nom }}</h2>
+        <nav class="space-y-1">
+            <a href="/salon/{{ tenant.slug }}/admin" class="block py-2.5 px-4 rounded-lg hover:bg-gray-800 transition">🏠 Accueil</a>
+            <a href="/salon/{{ tenant.slug }}/admin/services" class="block py-2.5 px-4 rounded-lg hover:bg-gray-800 transition">💈 Services</a>
+            <a href="/salon/{{ tenant.slug }}/admin/coiffeurs" class="block py-2.5 px-4 rounded-lg hover:bg-gray-800 transition">👤 Équipe</a>
+            <a href="/salon/{{ tenant.slug }}/admin/galerie" class="block py-2.5 px-4 rounded-lg hover:bg-gray-800 transition">🖼️ Galerie</a>
+            <a href="/salon/{{ tenant.slug }}/admin/bookings" class="block py-2.5 px-4 rounded-lg hover:bg-gray-800 transition">📅 Réservations</a>
+            <a href="/salon/{{ tenant.slug }}/admin/temoignages" class="block py-2.5 px-4 rounded-lg bg-[#D4AF37] bg-opacity-20 text-[#D4AF37] font-semibold">⭐ Avis</a>
+            <a href="/salon/{{ tenant.slug }}/admin/theme" class="block py-2.5 px-4 rounded-lg hover:bg-gray-800 transition">🎨 Thème</a>
+            <a href="/salon/{{ tenant.slug }}/admin/map" class="block py-2.5 px-4 rounded-lg hover:bg-gray-800 transition">📍 Carte</a>
+        </nav>
+    </aside>
+
+    <!-- Contenu principal -->
+   <div class="space-y-4">
+    {% for avis in temoignages %}
+        {% with tenant_slug=tenant.slug %}
+            {% include 'salon/_temoignage_row.html' %}
+        {% endwith %}
+    {% else %}
+        <p class="text-gray-500">Aucun témoignage pour le moment.</p>
+    {% endfor %}
+</div>
+</body>
+<script>
+    document.body.addEventListener('htmx:beforeRequest', function(evt) {
+        if (evt.detail.target.matches('[hx-post*="/temoignages/approve"]')) {
+            evt.detail.target.disabled = true;
+            evt.detail.target.innerHTML = '<i class="bi bi-hourglass-split animate-spin"></i>';
+        }
+    });
+    
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.target.matches('[hx-post*="/temoignages/approve"]')) {
+            // Le contenu de la ligne est déjà remplacé par HTMX
+        }
+    });
+</script>
+</html>

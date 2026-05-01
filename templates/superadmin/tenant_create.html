@@ -1,0 +1,46 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Créer un Salon - SLIK</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #000; }
+        h1 { font-family: 'Montserrat', sans-serif; }
+    </style>
+</head>
+<body class="text-white flex items-center justify-center min-h-screen">
+    <div class="bg-[#111] border border-gray-800 rounded-xl p-8 w-full max-w-lg mx-4 shadow-2xl">
+        <h1 class="text-2xl font-bold text-[#D4AF37] mb-6 text-center">Nouveau Salon Partenaire</h1>
+        <form method="POST" class="space-y-4">
+            <div>
+                <label class="block text-sm mb-1">Nom du salon *</label>
+                <input type="text" name="nom" required class="w-full bg-black border border-gray-700 rounded p-2 text-white" placeholder="Ex: Shabaka Kinshasa">
+            </div>
+            <div>
+                <label class="block text-sm mb-1">Slug (identifiant URL) *</label>
+                <input type="text" name="slug" required class="w-full bg-black border border-gray-700 rounded p-2 text-white" placeholder="shabaka-kin">
+                <p class="text-xs text-gray-500 mt-1">Minuscules, sans accents, ex: "mon-salon"</p>
+            </div>
+            <div>
+                <label class="block text-sm mb-1">Téléphone</label>
+                <input type="text" name="phone" class="w-full bg-black border border-gray-700 rounded p-2 text-white" placeholder="+243 8XX XXX XXX">
+            </div>
+            <div>
+                <label class="block text-sm mb-1">Ville</label>
+                <input type="text" name="ville" class="w-full bg-black border border-gray-700 rounded p-2 text-white" placeholder="Kinshasa / Lubumbashi / Goma">
+            </div>
+            <div>
+                <label class="block text-sm mb-1">Adresse</label>
+                <input type="text" name="adresse_text" class="w-full bg-black border border-gray-700 rounded p-2 text-white" placeholder="12, Av. de la Paix">
+            </div>
+            <button type="submit" class="w-full bg-[#D4AF37] text-black py-3 rounded-full font-bold hover:bg-yellow-500 transition text-lg">
+                Créer le salon
+            </button>
+            <p class="text-xs text-gray-500 text-center mt-2">Un compte admin automatique sera créé (slug@slik.cd / 123456)</p>
+        </form>
+    </div>
+</body>
+</html>

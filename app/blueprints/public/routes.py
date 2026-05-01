@@ -1,0 +1,119 @@
+﻿from datetime import datetime
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, abort
+from flask_login import login_user, logout_user, login_required, current_user
+from app.models import db, Tenant, Service, Coiffeur, Temoignage, Galerie, Booking, Log, User, Reservation
+from app.utils.seo import generate_seo_meta
+from app.utils.tenant import get_tenant_slug
+
+public_bp = Blueprint('public', __name__)
+
+@public_bp.route('/health')
+def health_check():
+    return jsonify({"status": "ok"}), 200
+
+@public_bp.route('/<slug>')
+def index(slug):
+    tenant = Tenant.query.filter_by(slug=slug).first_or_404()
+    if not tenant.active:
+        return redirect(url_for('salon.suspendu', slug=slug))
+    services = Service.query.filter_by(tenant_slug=slug, active=True).order_by(Service.ordre).all()
+    coiffeurs = Coiffeur.query.filter_by(tenant_slug=slug, active=True).all()
+    temoignages = Temoignage.query.filter_by(tenant_slug=slug, approved=True).limit(6).all()
+    galeries = Galerie.query.filter_by(tenant_slug=slug).order_by(Galerie.id.desc()).limit(12).all()
+    seo = generate_seo_meta(tenant)
+    nb_creneaux = Booking.query.filter_by(tenant_slug=slug, status='en_attente').count()
+    nb_creneaux = max(3 - nb_creneaux, 0)
+    return render_template('salon/index.html', tenant=tenant, services=services, coiffeurs=coiffeurs, temoignages=temoignages, galeries=galeries, seo=seo, nb_creneaux=nb_creneaux)
+
+@public_bp.route('/<slug>/temoignage/add', methods=['POST'])
+def add_temoignage(slug):
+    tenant = Tenant.query.filter_by(slug=slug, active=True).first_or_404()
+    client_nom = request.form.get('client_nom', '').strip()
+    texte = request.form.get('texte', '').strip()
+    note_str = request.form.get('note', '5')
+    consentement = 'consentement_photo' in request.form
+    if not client_nom or not texte:
+        return "<div class='text-red-400'>Nom et texte obligatoires.</div>", 400
+    try:
+        note = int(note_str)
+        note = max(1, min(5, note))
+    except:
+        note = 5
+    tem = Temoignage(tenant_slug=slug, client_nom=client_nom, texte=texte, note=note, consentement_photo=consentement, approved=False)
+    db.session.add(tem)
+    db.session.commit()
+    log = Log(tenant_slug=slug, event_type='temoignage_add', message=f'{client_nom} a laissé un avis')
+    db.session.add(log)
+    db.session.commit()
+    return "<div class='bg-green-700 text-white px-4 py-2 rounded shadow-lg'>Merci ! Votre avis est en attente de validation.</div>"
+
+# ---------- UNIQUE route de réservation (POST) ----------
+@public_bp.route('/<slug>/booking', methods=['POST'])
+def submit_booking(slug):
+    tenant = Tenant.query.filter_by(slug=slug, active=True).first_or_404()
+    client_nom = request.form.get('client_nom', '').strip()
+    client_phone = request.form.get('client_phone', '').strip()
+    service_id = request.form.get('service_id')
+    date_rdv_str = request.form.get('date_rdv', '')
+    heure_rdv_str = request.form.get('heure_rdv', '')
+
+    if not client_nom or not client_phone or not date_rdv_str or not heure_rdv_str:
+        return "<div class='text-red-400'>Tous les champs sont obligatoires.</div>", 400
+
+    try:
+        date_rdv = datetime.strptime(date_rdv_str, '%Y-%m-%d').date()
+        heure_rdv = datetime.strptime(heure_rdv_str, '%H:%M').time()
+    except ValueError:
+        return "<div class='text-red-400'>Date ou heure invalide.</div>", 400
+
+    reservation = Reservation(
+        tenant_slug=slug,
+        client_nom=client_nom,
+        client_tel=client_phone,
+        service_id=service_id,
+        date_rdv=date_rdv,
+        heure_rdv=heure_rdv,
+        statut='en_attente'
+    )
+    db.session.add(reservation)
+    db.session.commit()
+    return "<div class='bg-green-700 text-white px-4 py-2 rounded'>Réservation enregistrée. Le salon vous contactera.</div>"
+
+# ---------- Page de réservation (optionnelle) ----------
+@public_bp.route('/<slug>/booking')
+def booking_form(slug):
+    tenant = Tenant.query.filter_by(slug=slug, active=True).first_or_404()
+    services = Service.query.filter_by(tenant_slug=slug, active=True).order_by(Service.ordre).all()
+    coiffeurs = Coiffeur.query.filter_by(tenant_slug=slug, active=True).all()
+    return render_template('public/booking.html', tenant=tenant, services=services, coiffeurs=coiffeurs)
+
+@public_bp.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        if current_user.role == 'superadmin':
+            return redirect(url_for('superadmin.dashboard'))
+        else:
+            return redirect(url_for('salon.admin', slug=current_user.tenant_slug))
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '')
+        user = User.query.filter_by(email=email).first()
+        if user and user.check_password(password):
+            login_user(user)
+            flash('Connexion réussie', 'success')
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
+            if user.role == 'superadmin':
+                return redirect(url_for('superadmin.dashboard'))
+            else:
+                return redirect(url_for('salon.admin', slug=user.tenant_slug))
+        else:
+            flash('Email ou mot de passe incorrect', 'error')
+    return render_template('public/login.html')
+
+@public_bp.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('public.index', slug='login'))

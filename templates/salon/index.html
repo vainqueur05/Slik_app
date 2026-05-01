@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ seo.title }}</title>
+    <meta name="description" content="{{ seo.description }}">
+    <link rel="canonical" href="{{ seo.canonical }}">
+    
+    <!-- OG Tags pour partage social -->
+    <meta property="og:title" content="{{ seo.title }}">
+    <meta property="og:description" content="{{ seo.description }}">
+    {% if tenant.cover_url %}<meta property="og:image" content="{{ tenant.cover_url }}">{% endif %}
+    <meta property="og:type" content="website">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Montserrat:wght@600;700;800;900&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+    <style>
+        :root {
+            --gold: #D4AF37;
+            --gold-light: #F4D03F;
+            --gold-dark: #B8941F;
+            --black: #050505;
+            --black-soft: #0d0d0d;
+            --black-elevated: #161616;
+            --red-accent: #DC2626;
+        }
+        
+        * { -webkit-tap-highlight-color: transparent; }
+        ::selection { background: var(--gold); color: #000; }
+        
+        body { 
+            font-family: 'Inter', sans-serif;
+            background: var(--black);
+            color: white;
+            overflow-x: hidden;
+        }
+        
+        h1, h2, h3, .font-display { 
+            font-family: 'Playfair Display', serif; 
+            letter-spacing: -0.02em;
+        }
+        .font-cormorant { font-family: 'Cormorant Garamond', serif; }
+        .font-mont { font-family: 'Montserrat', sans-serif; }
+        
+        /* ===== NAVBAR ===== */
+        .navbar-fixed {
+            position: fixed; top: 0; left: 0; right: 0;
+            z-index: 100; padding: 16px 0;
+            transition: all 0.4s;
+        }
+        .navbar-fixed.scrolled {
+            background: rgba(5, 5, 5, 0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+        }
+        .nav-link-modern {
+            color: rgba(255,255,255,0.7);
+            transition: color 0.3s;
+            font-weight: 500;
+        }
+        .nav-link-modern:hover { color: var(--gold); }
+        
+        /* ===== HERO PREMIUM ===== */
+        .hero-section {
+            position: relative; min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        .hero-bg {
+            position: absolute; inset: 0;
+            {% if tenant.cover_url %}
+            background-image: url('{{ tenant.cover_url }}');
+            background-size: cover; background-position: center;
+            {% else %}
+            background: linear-gradient(135deg, #1a1a1a, var(--black));
+            {% endif %}
+        }
+        .hero-overlay {
+            position: absolute; inset: 0;
+            background: linear-gradient(180deg, 
+                rgba(5,5,5,0.4) 0%, 
+                rgba(5,5,5,0.7) 50%, 
+                rgba(5,5,5,0.95) 100%
+            );
+        }
+        
+        /* Floating ornaments */
+        .ornament {
+            position: absolute; pointer-events: none;
+            color: var(--gold); opacity: 0.15;
+            animation: float 8s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-30px) rotate(8deg); }
+        }
+        
+        .hero-content {
+            position: relative; z-index: 10;
+            min-height: 100vh;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            text-align: center; padding: 120px 20px 60px;
+        }
+        
+        .hero-divider {
+            display: flex; align-items: center; gap: 16px;
+            margin-bottom: 24px; opacity: 0.9;
+        }
+        .hero-divider-line {
+            width: 50px; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+        .hero-divider-icon {
+            color: var(--gold); font-size: 1.2rem;
+        }
+        
+        .hero-eyebrow {
+            color: var(--gold);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            font-weight: 600;
+            font-family: 'Montserrat';
+        }
+        
+        .hero-title {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(3rem, 9vw, 7rem);
+            font-weight: 900; line-height: 0.95;
+            margin: 24px 0;
+            text-shadow: 0 4px 30px rgba(0,0,0,0.5);
+        }
+        .hero-title em {
+            font-style: italic; font-weight: 400;
+            color: var(--gold);
+        }
+        
+        .hero-subtitle {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+            color: rgba(255,255,255,0.85);
+            font-weight: 500; max-width: 600px;
+            margin: 0 auto 40px;
+            line-height: 1.5;
+        }
+        
+        /* ===== CTA PREMIUM ===== */
+        .btn-cta-hero {
+            background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+            color: #000; font-weight: 800;
+            padding: 20px 48px; border-radius: 100px;
+            font-size: 1.1rem; border: none;
+            transition: all 0.4s;
+            position: relative; overflow: hidden;
+            box-shadow: 0 20px 50px rgba(212, 175, 55, 0.3);
+            text-transform: uppercase; letter-spacing: 1px;
+            cursor: pointer;
+        }
+        .btn-cta-hero::before {
+            content: ''; position: absolute; top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+            transition: left 0.6s;
+        }
+        .btn-cta-hero:hover::before { left: 100%; }
+        .btn-cta-hero:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 30px 60px rgba(212, 175, 55, 0.5);
+        }
+        
+        .btn-cta-secondary {
+            color: white; font-weight: 600;
+            padding: 18px 36px; border-radius: 100px;
+            border: 1.5px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s;
+            display: inline-flex; align-items: center; gap: 10px;
+        }
+        .btn-cta-secondary:hover {
+            background: rgba(255,255,255,0.08);
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+        
+        /* Hero stats */
+        .hero-stats {
+            display: flex; gap: 40px; flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .hero-stat {
+            text-align: center;
+        }
+            font-family: 'Playfair Display';
+            font-size: 2rem; font-weight: 900;
+            color: var(--gold);
+            line-height: 1;
+        }
+        .hero-stat-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: rgba(255,255,255,0.6);
+            margin-top: 8px;
+        }
+        
+        /* Trust badge */
+        .trust-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #22c55e;
+            padding: 6px 14px;
+            border-radius: 100px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 20px;
+        }
+        .trust-badge .dot {
+            width: 6px; height: 6px;
+            background: #22c55e;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        
+        /* Pulse urgent */
+        @keyframes pulse-urgent { 
+            0%, 100% { transform: scale(1); box-shadow: 0 20px 50px rgba(212, 175, 55, 0.3); } 
+            50% { transform: scale(1.05); box-shadow: 0 25px 60px rgba(212, 175, 55, 0.5); }
+        }
+        .pulse-urgent { animation: pulse-urgent 2s infinite; }
+        
+        /* ===== SECTION TITLE ===== */
+        .section-eyebrow {
+            display: inline-block;
+            color: var(--gold);
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            margin-bottom: 16px;
+            font-family: 'Montserrat';
+        }
+        .section-title-luxe {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 20px;
+        }
+        .section-title-luxe em {
+            font-style: italic;
+            font-weight: 400;
+            color: var(--gold);
+        }
+        .section-divider {
+            display: flex; justify-content: center;
+            align-items: center; gap: 16px;
+            margin: 30px 0;
+        }
+        .section-divider-line {
+            width: 60px; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+        
+        /* ===== TEAM CARDS ===== */
+        .team-card {
+            text-align: center;
+            transition: all 0.4s;
+        }
+        .team-photo-wrap {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+        .team-photo {
+            width: 160px; height: 160px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--gold);
+            transition: all 0.4s;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+        }
+        .team-card:hover .team-photo {
+            transform: scale(1.05);
+            box-shadow: 0 20px 50px rgba(212, 175, 55, 0.4);
+        }
+        .team-photo-placeholder {
+            width: 160px; height: 160px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--black-elevated), var(--black-soft));
+            border: 3px solid var(--gold);
+            display: flex; align-items: center; justify-content: center;
+            color: var(--gold); font-size: 3rem;
+        }
+        .team-badge {
+            position: absolute; bottom: 5px; right: 5px;
+            background: var(--gold); color: #000;
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.85rem; font-weight: 800;
+            border: 3px solid var(--black);
+        }
+        .team-name {
+            font-family: 'Playfair Display';
+            font-size: 1.4rem; font-weight: 700;
+            margin-top: 8px;
+        }
+        .team-role {
+            color: rgba(255,255,255,0.6);
+            font-size: 0.9rem;
+            margin: 4px 0;
+        }
+        .team-exp {
+            color: var(--gold);
+            font-size: 0.8rem; font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .btn-book-stylist {
+            background: rgba(212, 175, 55, 0.1);
+            color: var(--gold);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            padding: 8px 18px;
+            border-radius: 100px;
+            font-size: 0.8rem; font-weight: 600;
+            margin-top: 14px;
+            transition: all 0.3s;
+        }
+        .btn-book-stylist:hover {
+            background: var(--gold);
+            color: #000;
+            transform: translateY(-2px);
+        }
+        
+        /* ===== GALLERY SLIDER ===== */
+        .slider-container { 
+            overflow-x: auto; 
+            scroll-snap-type: x mandatory; 
+            -webkit-overflow-scrolling: touch; 
+            cursor: grab;
+            scrollbar-width: none;
+        }
+        .slider-container::-webkit-scrollbar { display: none; }
+        .slider-container.dragging { cursor: grabbing; }
+        .slider-item { 
+            scroll-snap-align: start; 
+            flex-shrink: 0; 
+        }
+        
+        .gallery-card {
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            background: var(--black-soft);
+            transition: all 0.4s;
+        }
+        .gallery-card:hover {
+            transform: scale(1.02) translateY(-4px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+        }
+        .gallery-card img {
+            width: 100%; height: 320px;
+            object-fit: cover;
+            transition: transform 0.6s;
+        }
+        .gallery-card:hover img { transform: scale(1.08); }
+        
+        .gallery-tag {
+            position: absolute; top: 16px; left: 16px;
+            background: var(--gold); color: #000;
+            padding: 6px 14px;
+            border-radius: 100px;
+            font-size: 0.7rem; font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            z-index: 2;
+        }
+        .gallery-overlay {
+            position: absolute; inset: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent 50%);
+            display: flex; align-items: flex-end;
+            padding: 20px; opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .gallery-card:hover .gallery-overlay { opacity: 1; }
+        
+        /* ===== TESTIMONIAL CARDS ===== */
+        .testimonial-card {
+            background: linear-gradient(135deg, var(--black-elevated), var(--black-soft));
+            border: 1px solid rgba(212, 175, 55, 0.1);
+            border-radius: 24px;
+            padding: 32px;
+            min-width: 340px; max-width: 380px;
+            position: relative;
+            transition: all 0.4s;
+        }
+        .testimonial-card:hover {
+            border-color: rgba(212, 175, 55, 0.3);
+            transform: translateY(-4px);
+        }
+        .testimonial-quote {
+            position: absolute; top: 20px; right: 24px;
+            font-family: 'Playfair Display';
+            font-size: 4rem; line-height: 1;
+            color: var(--gold); opacity: 0.2;
+        }
+        .testimonial-photo {
+            width: 70px; height: 70px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--gold);
+            margin: 0 auto 16px;
+        }
+        .testimonial-stars {
+            color: var(--gold);
+            margin-bottom: 16px;
+        }
+        .testimonial-text {
+            font-family: 'Cormorant Garamond';
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: rgba(255,255,255,0.85);
+            font-style: italic;
+        }
+        .testimonial-author {
+            color: var(--gold);
+            font-weight: 700;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(212, 175, 55, 0.1);
+        }
+        
+        /* ===== FORM STYLES ===== */
+        .form-luxe {
+            background: linear-gradient(135deg, var(--black-elevated), var(--black-soft));
+            border: 1px solid rgba(212, 175, 55, 0.15);
+            border-radius: 24px;
+            padding: 40px;
+        }
+        .input-luxe {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.05);
+            color: white;
+            border-radius: 12px;
+            padding: 14px 18px;
+            transition: all 0.3s;
+            width: 100%;
+        }
+        .input-luxe:focus {
+            border-color: var(--gold);
+            background: rgba(212, 175, 55, 0.05);
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.1);
+        }
+        .input-luxe::placeholder { color: rgba(255,255,255,0.3); }
+        
+        /* ===== MAP ===== */
+        .map-container {
+            border-radius: 24px;
+            overflow: hidden;
+            border: 1px solid rgba(212, 175, 55, 0.2);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.4);
+        }
+        #map { height: 450px; }
+        
+        /* ===== FOMO CTA ===== */
+        .fomo-section {
+            background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dark) 100%);
+            color: #000;
+            position: relative;
+            overflow: hidden;
+        }
+        .fomo-section::before {
+            content: ''; position: absolute; inset: 0;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2), transparent 50%);
+        }
+        
+        /* ===== WHATSAPP FLOAT ===== */
+        .whatsapp-float {
+            position: fixed; bottom: 24px; right: 24px;
+            width: 64px; height: 64px;
+            background: linear-gradient(135deg, #25D366, #128C7E);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 10px 30px rgba(37, 211, 102, 0.4);
+            z-index: 50;
+            transition: all 0.3s;
+        }
+        .whatsapp-float::before {
+            content: ''; position: absolute; inset: -5px;
+            border-radius: 50%; border: 2px solid #25D366;
+            animation: ripple 2s infinite;
+        }
+        @keyframes ripple {
+            0% { transform: scale(1); opacity: 0.6; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+        .whatsapp-float:hover {
+            transform: scale(1.1) rotate(-8deg);
+            box-shadow: 0 15px 40px rgba(37, 211, 102, 0.6);
+        }
+        
+        /* ===== MODAL ===== */
+        .modal-luxe {
+            background: linear-gradient(135deg, var(--black-elevated), var(--black));
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 28px;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.7);
+        }
+        
+        /* ===== FOOTER ===== */
+        footer {
+            background: linear-gradient(180deg, var(--black) 0%, #000 100%);
+            border-top: 1px solid rgba(212, 175, 55, 0.15);
+            position: relative;
+        }
+        footer::before {
+            content: ''; position: absolute;
+            top: 0; left: 50%; transform: translateX(-50%);
+            width: 200px; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+    </style>
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BeautySalon",
+        "name": "{{ tenant.nom }}",
+        "address": "{{ tenant.adresse_text }}",
+        "telephone": "{{ tenant.phone }}",
+        "priceRange": "$$",
+        "openingHours": "Mo-Sa 08:00-20:00"
+    }
+    </script>
+</head>
+<body>
+
+    <!-- ===== NAVBAR ===== -->
+    <nav class="navbar-fixed" id="navbar">
+        <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                {% if tenant.logo_url %}
+                <img src="{{ tenant.logo_url }}" class="w-11 h-11 rounded-full object-cover" style="border: 2px solid var(--gold);">
+                {% endif %}
+                <span class="font-display text-xl font-bold" style="color: var(--gold);">{{ tenant.nom }}</span>
+            </div>
+            <div class="hidden md:flex items-center gap-8">
+                <a href="#services" class="nav-link-modern text-sm">Services</a>
+                <a href="#equipe" class="nav-link-modern text-sm">Équipe</a>
+                <a href="#galerie" class="nav-link-modern text-sm">Galerie</a>
+                <a href="#temoignages" class="nav-link-modern text-sm">Avis</a>
+                <button onclick="openBookingModal()" class="btn-cta-secondary text-sm" style="padding: 10px 22px;">
+                    <i class="bi bi-calendar-check"></i> Réserver
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ===== HERO PREMIUM ===== -->
+    <section class="hero-section">
+        <div class="hero-bg"></div>
+        <div class="hero-overlay"></div>
+        
+        <!-- Ornaments -->
+        <i class="bi bi-stars ornament" style="top: 15%; left: 10%; font-size: 2rem;"></i>
+        <i class="bi bi-scissors ornament" style="top: 25%; right: 15%; font-size: 2.5rem; animation-delay: -2s;"></i>
+        <i class="bi bi-gem ornament" style="bottom: 30%; left: 8%; font-size: 1.8rem; animation-delay: -4s;"></i>
+        <i class="bi bi-stars ornament" style="bottom: 20%; right: 10%; font-size: 1.5rem; animation-delay: -6s;"></i>
+        
+        <div class="hero-content">
+            <!-- Trust badge -->
+            <div class="trust-badge">
+                <span class="dot"></span>
+                <span>Ouvert maintenant · {{ nb_creneaux }} créneaux libres</span>
+            </div>
+            
+            <!-- Divider -->
+            <div class="hero-divider mt-6">
+                <div class="hero-divider-line"></div>
+                <i class="bi bi-stars hero-divider-icon"></i>
+                <div class="hero-divider-line"></div>
+            </div>
+            
+            <span class="hero-eyebrow">Salon de prestige · {{ tenant.ville or 'Premium' }}</span>
+            
+            <h1 class="hero-title">
+                {{ tenant.nom }}<br>
+                <em>Votre signature.</em>
+            </h1>
+            
+            <p class="hero-subtitle">
+                {{ tenant.theme_json|fromjson|get('hero_text', 'L\'art de la coiffure haute couture, taillé à votre image. Chaque coupe est une œuvre, chaque client une muse.') }}
+            </p>
+            
+            <!-- CTA Group -->
+            <div class="flex flex-col sm:flex-row gap-4 items-center justify-center mt-4">
+                <button onclick="openBookingModal()" class="btn-cta-hero pulse-urgent">
+                    <i class="bi bi-calendar-heart mr-2"></i>
+                    Réserver maintenant
+                </button>
+                {% if tenant.phone %}
+                <a href="tel:{{ tenant.phone }}" class="btn-cta-secondary">
+                    <i class="bi bi-telephone-fill"></i> Appeler
+                </a>
+                {% endif %}
+            </div>
+            
+            <!-- Hero stats -->
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <div class="hero-stat-label">Note moyenne</div>
+                </div>
+                <div class="hero-stat">
+                    
+                    <div class="hero-stat-label">Experts</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-label">Clients heureux</div>
+                </div>
+                <div class="hero-stat">
+                    <div class="hero-stat-label">Délai moyen</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Scroll indicator -->
+        <div class="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 text-center" style="color: var(--gold);">
+            <p class="text-xs uppercase tracking-widest mb-2">Découvrir</p>
+            <i class="bi bi-chevron-down text-2xl animate-bounce"></i>
+        </div>
+    </section>
+
+    <!-- SERVICES (partial) -->
+    {% include 'partials/services.html' %}
+
+    <!-- ===== ÉQUIPE PREMIUM ===== -->
+    <section class="py-24" id="equipe" style="background: linear-gradient(180deg, var(--black) 0%, var(--black-soft) 100%);">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-16">
+                <span class="section-eyebrow">L'équipe</span>
+                <h2 class="section-title-luxe">
+                    Les <em>artistes</em><br>de votre style
+                </h2>
+                <div class="section-divider">
+                    <div class="section-divider-line"></div>
+                    <i class="bi bi-stars" style="color: var(--gold);"></i>
+                    <div class="section-divider-line"></div>
+                </div>
+                <p class="font-cormorant text-xl text-gray-400 max-w-2xl mx-auto">
+                    Des mains expertes, une vision unique. Chaque membre de notre équipe est sélectionné pour son talent exceptionnel.
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+                {% for coiffeur in coiffeurs %}
+                <div class="team-card" data-gsap="fade-up">
+                    <div class="team-photo-wrap">
+                        {% if coiffeur.photo_url %}
+                        <img src="{{ coiffeur.photo_url }}" alt="{{ coiffeur.nom }}" class="team-photo">
+                        {% else %}
+                        <div class="team-photo-placeholder">
+                            <i class="bi bi-person"></i>
+                        </div>
+                        {% endif %}
+                        {% if coiffeur.annees_exp >= 10 %}
+                        <div class="team-badge" title="Expert"><i class="bi bi-award-fill"></i></div>
+                        {% endif %}
+                    </div>
+                    <h3 class="team-name">{{ coiffeur.nom }}</h3>
+                    <p class="team-role">{{ coiffeur.specialite }}</p>
+                    <p class="team-exp">{{ coiffeur.annees_exp }} ans d'art</p>
+                    
+                    {% if coiffeur.instagram %}
+                    <a href="https://instagram.com/{{ coiffeur.instagram }}" target="_blank" 
+                       class="text-pink-400 text-xs hover:text-pink-300 mt-2 inline-block">
+                        <i class="bi bi-instagram"></i> @{{ coiffeur.instagram }}
+                    </a>
+                    {% endif %}
+                    
+                    <div>
+                        <button onclick="openBookingModal(null, {{ coiffeur.id }})" class="btn-book-stylist">
+                            <i class="bi bi-calendar-heart mr-1"></i>
+                            Réserver avec {{ coiffeur.nom.split(' ')[0] }}
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== GALERIE PREMIUM ===== -->
+    <section class="py-24" id="galerie" style="background: var(--black-soft);">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-16">
+                <span class="section-eyebrow">Inspirations</span>
+                <h2 class="section-title-luxe">
+                    Transformations<br><em>signature</em>
+                </h2>
+                <div class="section-divider">
+                    <div class="section-divider-line"></div>
+                    <i class="bi bi-camera-fill" style="color: var(--gold);"></i>
+                    <div class="section-divider-line"></div>
+                </div>
+                <p class="font-cormorant text-xl text-gray-400 max-w-2xl mx-auto">
+                    Glissez à travers nos créations récentes. Chaque image raconte une histoire.
+                </p>
+            </div>
+            
+            {% if galeries %}
+            <div class="slider-container flex gap-6 pb-4" id="slider-galerie">
+                {% for img in galeries %}
+                <div class="slider-item w-80 md:w-96">
+                    <div class="gallery-card">
+                        <span class="gallery-tag">{{ img.type | capitalize }}</span>
+                        <img src="{{ img.photo_url }}" alt="{{ img.legende or 'Transformation' }}" loading="lazy">
+                        <div class="gallery-overlay">
+                            <p class="font-cormorant text-lg">
+                                {{ img.legende or 'Une transformation magique' }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <p class="text-center text-sm text-gray-500 mt-6">
+                <i class="bi bi-arrow-left-right mr-2"></i>Glissez pour explorer
+            </p>
+            {% else %}
+            <div class="text-center py-20">
+                <i class="bi bi-images text-6xl opacity-20"></i>
+                <p class="text-gray-500 mt-4">La galerie sera bientôt disponible.</p>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- FAQ (partial) -->
+    {% include 'partials/faq.html' %}
+
+    <!-- ===== TÉMOIGNAGES PREMIUM ===== -->
+    <section class="py-24" id="temoignages" style="background: var(--black);">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-16">
+                <span class="section-eyebrow">Paroles d'or</span>
+                <h2 class="section-title-luxe">
+                    Ils <em>témoignent</em>
+                </h2>
+                <div class="section-divider">
+                    <div class="section-divider-line"></div>
+                    <i class="bi bi-quote" style="color: var(--gold);"></i>
+                    <div class="section-divider-line"></div>
+                </div>
+            </div>
+            
+            {% if temoignages %}
+            <div class="slider-container flex gap-6 pb-6" id="temoignages-carousel">
+                {% for avis in temoignages %}
+                <div class="slider-item">
+                    <div class="testimonial-card">
+                        <span class="testimonial-quote">"</span>
+                        
+                        {% if avis.photo_url %}
+                        <img src="{{ avis.photo_url }}" class="testimonial-photo" alt="{{ avis.client_nom }}">
+                        {% else %}
+                        <div class="testimonial-photo flex items-center justify-center" style="background: var(--gold); color: #000; font-weight: 800; font-size: 1.5rem;">
+                            {{ avis.client_nom[0]|upper }}
+                        </div>
+                        {% endif %}
+                        
+                        <div class="testimonial-stars text-center">
+                            {% for i in range(avis.note) %}<i class="bi bi-star-fill"></i>{% endfor %}
+                        </div>
+                        
+                        <p class="testimonial-text text-center">
+                            "{{ avis.texte }}"
+                        </p>
+                        
+                        <p class="testimonial-author text-center">
+                            — {{ avis.client_nom }}
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            
+            <!-- Form temoignage -->
+            <div class="max-w-lg mx-auto mt-16">
+                <div class="form-luxe">
+                    <div class="text-center mb-6">
+                        <i class="bi bi-pen-fill text-3xl" style="color: var(--gold);"></i>
+                        <h3 class="font-display text-2xl mt-3 mb-2">Partagez votre expérience</h3>
+                        <p class="text-sm text-gray-400">Votre avis aide notre famille à grandir</p>
+                    </div>
+                    
+                    <form hx-post="/{{ tenant.slug }}/temoignage/add" hx-target="#temoignage-toast" hx-swap="innerHTML">
+                        <input type="text" name="client_nom" placeholder="Votre nom" required class="input-luxe mb-3">
+                        <textarea name="texte" placeholder="Racontez-nous votre transformation..." required class="input-luxe mb-3" rows="4"></textarea>
+                        
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-sm text-gray-400">Note :</span>
+                            <div class="flex gap-1" id="rating-stars">
+                                {% for i in range(1, 6) %}
+                                <button type="button" onclick="setRating({{ i }})" class="rating-btn text-2xl" data-val="{{ i }}" style="color: rgba(255,255,255,0.2);">
+                                    <i class="bi bi-star-fill"></i>
+                                </button>
+                                {% endfor %}
+                            </div>
+                            <input type="hidden" name="note" id="rating-input" value="5">
+                        </div>
+                        
+                        <label class="flex items-center gap-2 text-xs text-gray-400 mb-5">
+                            <input type="checkbox" name="consentement_photo" class="accent-yellow-500">
+                            J'accepte que ma photo soit utilisée
+                        </label>
+                        
+                        <button type="submit" class="btn-cta-hero w-full">
+                            <i class="bi bi-send-fill mr-2"></i>Publier mon avis
+                        </button>
+                    </form>
+                    <div id="temoignage-toast" class="mt-4"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- BOOKING (partial) -->
+    {% include 'partials/booking.html' %}
+
+    <!-- ===== MAP PREMIUM ===== -->
+    <section class="py-24" id="map-section" style="background: var(--black-soft);">
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="text-center mb-12">
+                <span class="section-eyebrow">Localisation</span>
+                <h2 class="section-title-luxe">
+                    Venez nous <em>rencontrer</em>
+                </h2>
+                <div class="section-divider">
+                    <div class="section-divider-line"></div>
+                    <i class="bi bi-geo-alt-fill" style="color: var(--gold);"></i>
+                    <div class="section-divider-line"></div>
+                </div>
+                {% if tenant.adresse_text %}
+                <p class="font-cormorant text-xl text-gray-400">
+                    <i class="bi bi-pin-map-fill mr-2" style="color: var(--gold);"></i>
+                    {{ tenant.adresse_text }}
+                </p>
+                {% endif %}
+            </div>
+            
+            <div class="map-container">
+                <div id="map"></div>
+            </div>
+            
+            <div class="flex flex-wrap justify-center gap-4 mt-8">
+                <a href="https://www.google.com/maps/dir/?api=1&destination={{ tenant.lat }},{{ tenant.lng }}" 
+                   target="_blank" class="btn-cta-hero">
+                    <i class="bi bi-geo-alt mr-2"></i>Itinéraire
+                </a>
+                {% if tenant.phone %}
+                <a href="tel:{{ tenant.phone }}" class="btn-cta-secondary">
+                    <i class="bi bi-telephone-fill"></i> {{ tenant.phone }}
+                </a>
+                {% endif %}
+                <a href="https://wa.me/{{ whatsapp }}" target="_blank" class="btn-cta-secondary" style="border-color: rgba(37, 211, 102, 0.3); color: #25D366;">
+                    <i class="bi bi-whatsapp"></i> WhatsApp
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== CTA FINAL FOMO ===== -->
+    <section class="py-24 fomo-section relative" id="cta-final">
+        <div class="max-w-4xl mx-auto text-center px-6 relative z-10">
+            <div class="mb-6">
+                <i class="bi bi-stars text-5xl"></i>
+            </div>
+            <h2 class="font-display text-5xl md:text-6xl font-black mb-4">
+                Votre métamorphose<br>
+                <em style="font-weight: 400;">vous attend</em>
+            </h2>
+            <p class="text-xl mb-2 font-medium">
+                Plus que <span class="font-bold underline decoration-2">{{ nb_creneaux }} créneaux</span> disponibles ce week-end
+            </p>
+            <p class="text-lg mb-10 font-bold opacity-80">
+                ✨ Transformation garantie ou remboursée
+            </p>
+            <button onclick="triggerConfetti(); openBookingModal();" 
+                    class="bg-black text-white px-14 py-5 rounded-full text-xl font-bold shadow-2xl pulse-urgent hover:bg-gray-900 transition transform hover:scale-105"
+                    style="text-transform: uppercase; letter-spacing: 1.5px;">
+                <i class="bi bi-calendar-heart mr-2"></i>
+                Je réserve maintenant
+            </button>
+        </div>
+        <canvas id="confetti-canvas" class="absolute inset-0 z-0 pointer-events-none"></canvas>
+    </section>
+
+    <!-- ===== MODAL RÉSERVATION ===== -->
+    <div id="booking-modal" class="hidden fixed inset-0 bg-black bg-opacity-90 backdrop-blur-sm flex items-center justify-center z-50 p-4" 
+         onclick="if(event.target===this) closeBookingModal()">
+        <div class="modal-luxe max-w-md w-full p-8 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <span class="section-eyebrow text-xs">Réservation</span>
+                    <h3 class="font-display text-2xl font-bold mt-1" style="color: var(--gold);">
+                        Express
+                    </h3>
+                </div>
+                <button onclick="closeBookingModal()" class="text-gray-500 hover:text-white text-2xl transition">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div id="booking-form-container" hx-get="/{{ tenant.slug }}/booking" hx-trigger="load">
+                <div class="text-center py-12">
+                    <i class="bi bi-arrow-clockwise animate-spin text-3xl" style="color: var(--gold);"></i>
+                    <p class="mt-3 text-gray-400">Chargement...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== FOOTER PREMIUM ===== -->
+    <footer class="py-16 px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
+                <div class="col-span-2 md:col-span-1">
+                    <div class="flex items-center gap-3 mb-4">
+                        {% if tenant.logo_url %}
+                        <img src="{{ tenant.logo_url }}" class="w-12 h-12 rounded-full object-cover" style="border: 2px solid var(--gold);">
+                        {% endif %}
+                        <h3 class="font-display text-2xl" style="color: var(--gold);">{{ tenant.nom }}</h3>
+                    </div>
+                    <p class="font-cormorant text-lg text-gray-400 mb-4">
+                        Votre signature royale.
+                    </p>
+                    <div class="trust-badge">
+                        <span class="dot"></span>Ouvert maintenant
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="font-mont font-bold mb-4 text-sm uppercase tracking-widest" style="color: var(--gold);">
+                        Horaires
+                    </h4>
+                    <p class="text-sm text-gray-400 mb-2">
+                        <i class="bi bi-clock mr-2"></i>Lun - Sam · 08h - 20h
+                    </p>
+                    <p class="text-sm text-gray-400">
+                        <i class="bi bi-x-circle mr-2"></i>Dimanche fermé
+                    </p>
+                </div>
+                
+                <div>
+                    <h4 class="font-mont font-bold mb-4 text-sm uppercase tracking-widest" style="color: var(--gold);">
+                        Liens rapides
+                    </h4>
+                    <a href="#services" class="block text-sm text-gray-400 hover:text-yellow-500 mb-2 transition">Services</a>
+                    <a href="#equipe" class="block text-sm text-gray-400 hover:text-yellow-500 mb-2 transition">Équipe</a>
+                    <a href="#galerie" class="block text-sm text-gray-400 hover:text-yellow-500 mb-2 transition">Galerie</a>
+                    <a href="#temoignages" class="block text-sm text-gray-400 hover:text-yellow-500 transition">Avis</a>
+                </div>
+                
+                <div>
+                    <h4 class="font-mont font-bold mb-4 text-sm uppercase tracking-widest" style="color: var(--gold);">
+                        Suivez-nous
+                    </h4>
+                    <div class="flex gap-3">
+                        <a href="https://instagram.com/{{ tenant.slug }}" target="_blank" 
+                           class="w-11 h-11 rounded-full flex items-center justify-center transition"
+                           style="background: rgba(212, 175, 55, 0.1); border: 1px solid rgba(212, 175, 55, 0.2); color: var(--gold);">
+                            <i class="bi bi-instagram"></i>
+                        </a>
+                        <a href="#" target="_blank" 
+                           class="w-11 h-11 rounded-full flex items-center justify-center transition"
+                           style="background: rgba(212, 175, 55, 0.1); border: 1px solid rgba(212, 175, 55, 0.2); color: var(--gold);">
+                            <i class="bi bi-facebook"></i>
+                        </a>
+                        <a href="https://wa.me/{{ whatsapp }}" target="_blank" 
+                           class="w-11 h-11 rounded-full flex items-center justify-center transition"
+                           style="background: rgba(37, 211, 102, 0.1); border: 1px solid rgba(37, 211, 102, 0.2); color: #25D366;">
+                            <i class="bi bi-whatsapp"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="pt-8 text-center" style="border-top: 1px solid rgba(212, 175, 55, 0.1);">
+                <p class="text-xs text-gray-500">
+                    © 2026 {{ tenant.nom }} · Conçu avec passion · 
+                    <span style="color: var(--gold);">Powered by SLIK</span>
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- WhatsApp Float -->
+    <a href="https://wa.me/{{ whatsapp }}" target="_blank" class="whatsapp-float">
+        <i class="bi bi-whatsapp text-3xl text-white"></i>
+    </a>
+
+    <!-- ===== SCRIPTS ===== -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+    <script src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js" defer></script>
+    
+    <script>
+        // ===== NAVBAR SCROLL =====
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('navbar');
+            if (window.scrollY > 80) nav.classList.add('scrolled');
+            else nav.classList.remove('scrolled');
+        });
+
+        // ===== GSAP ANIMATIONS =====
+        gsap.registerPlugin(ScrollTrigger);
+        gsap.utils.toArray('[data-gsap="fade-up"]').forEach(el => {
+            gsap.from(el, { 
+                scrollTrigger: { trigger: el, start: "top 88%", once: true }, 
+                opacity: 0, y: 60, duration: 1, ease: "power3.out"
+            });
+        });
+
+        // ===== SLIDER GALERIE =====
+        const slider = document.getElementById('slider-galerie');
+        if (slider) {
+            let isDown = false, startX, scrollLeft;
+            slider.addEventListener('mousedown', (e) => { 
+                isDown = true; 
+                slider.classList.add('dragging');
+                startX = e.pageX - slider.offsetLeft; 
+                scrollLeft = slider.scrollLeft; 
+            });
+            slider.addEventListener('mouseleave', () => {
+                isDown = false; 
+                slider.classList.remove('dragging');
+            });
+            slider.addEventListener('mouseup', () => {
+                isDown = false;
+                slider.classList.remove('dragging');
+            });
+            slider.addEventListener('mousemove', (e) => { 
+                if (!isDown) return; 
+                e.preventDefault(); 
+                const x = e.pageX - slider.offsetLeft; 
+                const walk = (x - startX) * 2; 
+                slider.scrollLeft = scrollLeft - walk; 
+            });
+        }
+
+        // ===== RATING STARS =====
+        function setRating(val) {
+            document.getElementById('rating-input').value = val;
+            document.querySelectorAll('.rating-btn').forEach((btn, i) => {
+                btn.style.color = i < val ? '#D4AF37' : 'rgba(255,255,255,0.2)';
+            });
+        }
+        setRating(5);
+
+        // ===== CONFETTI =====
+        function triggerConfetti() {
+            const canvas = document.getElementById('confetti-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.parentElement.offsetWidth;
+            canvas.height = canvas.parentElement.offsetHeight;
+            const particles = [];
+            for (let i=0; i<80; i++) {
+                particles.push({ 
+                    x: Math.random() * canvas.width, 
+                    y: -50, 
+                    size: Math.random() * 10 + 5, 
+                    color: ['#000','#D4AF37','#fff','#DC2626'][Math.floor(Math.random()*4)], 
+                    vx: (Math.random()-0.5)*4, 
+                    vy: Math.random()*4+3,
+                    rotation: Math.random() * 360,
+                    rotationSpeed: (Math.random()-0.5)*10
+                });
+            }
+            function animate() { 
+                ctx.clearRect(0,0,canvas.width,canvas.height); 
+                particles.forEach(p => { 
+                    p.x += p.vx; 
+                    p.y += p.vy;
+                    p.rotation += p.rotationSpeed;
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.rotation * Math.PI / 180);
+                    ctx.fillStyle = p.color; 
+                    ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size); 
+                    ctx.restore();
+                }); 
+                if (particles.some(p => p.y < canvas.height + 50)) requestAnimationFrame(animate); 
+            }
+            animate();
+        }
+
+        // ===== MAP =====
+        {% if tenant.lat and tenant.lng %}
+        var map = L.map('map').setView([{{ tenant.lat }}, {{ tenant.lng }}], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+            attribution: '&copy; OpenStreetMap' 
+        }).addTo(map);
+        var goldIcon = L.icon({ 
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png', 
+            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png', 
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41] 
+        });
+        L.marker([{{ tenant.lat }}, {{ tenant.lng }}], {icon: goldIcon}).addTo(map)
+            .bindPopup('<b>{{ tenant.nom }}</b><br>{{ tenant.adresse_text or "" }}').openPopup();
+        {% else %}
+        var map = L.map('map').setView([-11.6646, 27.4779], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        {% endif %}
+
+        // ===== BOOKING MODAL =====
+        function openBookingModal(serviceId, coiffeurId) {
+            document.getElementById('booking-modal').classList.remove('hidden');
+            const url = new URL('/{{ tenant.slug }}/booking', window.location.origin);
+            if (serviceId) url.searchParams.set('service_id', serviceId);
+            if (coiffeurId) url.searchParams.set('coiffeur_id', coiffeurId);
+            document.getElementById('booking-form-container').setAttribute('hx-get', url.pathname + url.search);
+            htmx.process(document.getElementById('booking-form-container'));
+        }
+        function closeBookingModal() { 
+            document.getElementById('booking-modal').classList.add('hidden'); 
+        }
+    </script>
+</body>
+</html>

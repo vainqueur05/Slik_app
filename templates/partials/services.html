@@ -1,0 +1,61 @@
+{% if services and services|length > 0 %}
+{% set categories = services|map(attribute='categorie')|unique|list %}
+<section id="services" class="py-20 bg-[#111]">
+    <div class="max-w-7xl mx-auto px-4">
+        <h2 class="font-dream text-4xl text-center mb-12 text-white">Nos Services</h2>
+
+        {% if categories|length == 1 %}
+        <!-- Grille simple -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {% for service in services %}
+            <div class="bg-zinc-900 border border-yellow-500/20 hover:border-yellow-500 rounded-xl p-6 transition-all relative {{ 'bg-yellow-500/10' if service.is_vip }}">
+                {% if service.is_vip %}
+                <span class="absolute top-2 right-2 bg-yellow-500 text-black text-xs font-montserrat px-2 py-1 rounded">Populaire</span>
+                {% endif %}
+                <p class="font-inter text-xl text-white mb-2">{{ service.nom }}</p>
+                <p class="font-cormorant text-3xl text-yellow-500 mb-1">{{ service.prix }}</p>
+                <p class="font-inter text-sm text-gray-400 mb-4">{{ service.duree }}</p>
+                <a href="https://wa.me/{{ whatsapp }}?text=Bonjour, je réserve : {{ service.nom }}" target="_blank"
+                   class="font-montserrat font-bold bg-yellow-500 text-black px-6 py-2 rounded-lg inline-block">
+                    Réserver
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <!-- Tabs Alpine.js -->
+        <div x-data="{tab: '{{ categories[0] }}'}">
+            <div class="flex flex-wrap justify-center gap-2 mb-8">
+                {% for cat in categories %}
+                <button @click="tab='{{ cat }}'" 
+                        :class="tab==='{{ cat }}' ? 'bg-yellow-500 text-black' : 'bg-zinc-800 text-white'"
+                        class="px-4 py-2 rounded-full font-montserrat text-sm transition">
+                    {{ cat }}
+                </button>
+                {% endfor %}
+            </div>
+            {% for cat in categories %}
+            <div x-show="tab==='{{ cat }}'" x-transition.opacity>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {% for service in services if service.categorie == cat %}
+                    <div class="bg-zinc-900 border border-yellow-500/20 hover:border-yellow-500 rounded-xl p-6 transition-all relative {{ 'bg-yellow-500/10' if service.is_vip }}">
+                        {% if service.is_vip %}
+                        <span class="absolute top-2 right-2 bg-yellow-500 text-black text-xs font-montserrat px-2 py-1 rounded">Populaire</span>
+                        {% endif %}
+                        <p class="font-inter text-xl text-white mb-2">{{ service.nom }}</p>
+                        <p class="font-cormorant text-3xl text-yellow-500 mb-1">{{ service.prix }}</p>
+                        <p class="font-inter text-sm text-gray-400 mb-4">{{ service.duree }}</p>
+                        <a href="https://wa.me/{{ whatsapp }}?text=Bonjour, je réserve : {{ service.nom }}" target="_blank"
+                           class="font-montserrat font-bold bg-yellow-500 text-black px-6 py-2 rounded-lg inline-block">
+                            Réserver
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endif %}

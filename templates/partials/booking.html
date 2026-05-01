@@ -1,0 +1,35 @@
+<section id="booking" class="py-20 bg-[#111]">
+    <div class="max-w-2xl mx-auto px-4">
+        <h2 class="font-dream text-4xl text-center mb-12 text-white">Prendre Rendez-vous</h2>
+        <form id="bookingForm" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <input type="text" name="nom" placeholder="Votre nom" required class="font-inter bg-black border border-zinc-700 rounded p-3 text-white">
+            <input type="tel" name="tel" placeholder="Votre WhatsApp" required class="font-inter bg-black border border-zinc-700 rounded p-3 text-white">
+            <select name="service" required class="font-inter bg-black border border-zinc-700 rounded p-3 text-white">
+                <option value="">-- Choisir un service --</option>
+                {% for service in services %}
+                <option value="{{ service.nom }}">{{ service.nom }}</option>
+                {% endfor %}
+            </select>
+            <input type="date" name="date" required min="{{ today }}" class="font-inter bg-black border border-zinc-700 rounded p-3 text-white">
+            <button type="submit" class="font-montserrat font-bold bg-yellow-500 text-black col-span-2 py-3 rounded-lg">
+                Envoyer sur WhatsApp
+            </button>
+        </form>
+    </div>
+</section>
+
+<script>
+document.getElementById('bookingForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const data = new FormData(this);
+    const message = `Bonjour {{ tenant.nom }}. Je suis ${data.get('nom')}. Je veux réserver ${data.get('service')} le ${data.get('date')}. Mon tel : ${data.get('tel')}`;
+    window.open(`https://wa.me/{{ whatsapp }}?text=${encodeURIComponent(message)}`, '_blank');
+
+    // Sauvegarde en base (optionnelle)
+    fetch('/api/reservation', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(Object.fromEntries(data))
+    });
+});
+</script>

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galerie - {{ tenant.nom }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2 { font-family: 'Montserrat', sans-serif; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-up { animation: fadeUp 0.6s ease-out; }
+        .sticky-bottom { position: sticky; bottom: 0; background: #111; padding-top: 10px; margin-top: 10px; }
+    </style>
+</head>
+<body class="bg-black text-white flex min-h-screen">
+
+    <aside class="w-64 bg-[#0a0a0a] border-r border-gray-800 p-6 flex-shrink-0">
+        <h2 class="text-2xl font-bold text-[#D4AF37] mb-8">{{ tenant.nom }}</h2>
+        <nav class="space-y-1">
+            <a href="/salon/{{ tenant.slug }}/admin" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-house"></i> Accueil</a>
+            <a href="/salon/{{ tenant.slug }}/admin/services" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-scissors"></i> Services</a>
+            <a href="/salon/{{ tenant.slug }}/admin/coiffeurs" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-people"></i> Équipe</a>
+            <a href="/salon/{{ tenant.slug }}/admin/galerie" class="flex items-center gap-2 py-2.5 px-4 rounded-lg bg-[#D4AF37] bg-opacity-20 text-[#D4AF37] font-semibold"><i class="bi bi-images"></i> Galerie</a>
+            <a href="/salon/{{ tenant.slug }}/admin/bookings" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-calendar-check"></i> Réservations</a>
+            <a href="/salon/{{ tenant.slug }}/admin/temoignages" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-star"></i> Avis</a>
+            <a href="/salon/{{ tenant.slug }}/admin/theme" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-palette"></i> Thème</a>
+            <a href="/salon/{{ tenant.slug }}/admin/map" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-geo-alt"></i> Carte</a>
+        </nav>
+    </aside>
+
+    <main class="flex-1 p-8 animate-fade-up">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold">Galerie Avant/Après</h1>
+            <button onclick="document.getElementById('galerie-modal').classList.remove('hidden')"
+                    class="bg-[#D4AF37] text-black px-4 py-2 rounded-full font-bold hover:bg-yellow-500 transition flex items-center gap-2">
+                <i class="bi bi-plus-circle"></i> Ajouter une photo
+            </button>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {% for img in galeries %}
+            <div class="bg-[#111] border border-gray-700 rounded-xl overflow-hidden relative group animate-fade-up">
+                <img src="{{ img.photo_url }}" class="w-full h-40 object-cover">
+                <div class="absolute top-2 left-2 bg-black bg-opacity-70 text-xs font-bold px-2 py-1 rounded {{ 'text-green-400' if img.type == 'apres' else 'text-red-400' }}">{{ img.type | capitalize }}</div>
+                <div class="p-3">
+                    <p class="text-sm text-gray-300 truncate">{{ img.legende or 'Sans légende' }}</p>
+                    <form method="POST" action="/salon/{{ tenant.slug }}/admin/galerie/delete/{{ img.id }}" class="mt-2" onsubmit="return confirm('Supprimer cette photo ?')">
+                        <button type="submit" class="text-xs text-red-400 hover:underline flex items-center gap-1"><i class="bi bi-trash"></i> Supprimer</button>
+                    </form>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-gray-500 col-span-4 text-center py-8">Aucune photo dans la galerie.</p>
+            {% endfor %}
+        </div>
+
+        <!-- MODAL Galerie -->
+        <div id="galerie-modal" class="hidden fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50" onclick="if(event.target===this) this.classList.add('hidden')">
+            <div class="bg-[#111] p-6 rounded-xl max-w-md w-full mx-4 border border-[#D4AF37] animate-fade-up" style="max-height:85vh; overflow-y:auto;">
+                <h3 class="text-xl font-bold mb-4 text-[#D4AF37] flex items-center gap-2"><i class="bi bi-cloud-upload"></i> Ajouter à la galerie</h3>
+                <form method="POST" action="/salon/{{ tenant.slug }}/admin/galerie" class="space-y-4">
+                    <input type="hidden" name="photo_cloudinary_id" id="upload-galerie-cloudinary-id" value="">
+                    <input type="hidden" name="photo_url" id="upload-galerie-cloudinary-url" value="">
+                    <div>
+                        <label class="block text-sm mb-1">Type</label>
+                        <select name="type" class="w-full bg-black border border-gray-700 rounded p-2 text-white">
+                            <option value="avant">Avant</option>
+                            <option value="apres">Après</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1">Légende</label>
+                        <input type="text" name="legende" class="w-full bg-black border border-gray-700 rounded p-2 text-white" placeholder="De ça → À ça en 45min">
+                    </div>
+
+                    <div id="upload-galerie"></div>
+
+                    <div class="sticky-bottom">
+                        <button type="submit" id="btn-save-galerie"
+                                class="w-full bg-[#D4AF37] text-black py-2 rounded-full font-bold hover:bg-yellow-500 transition flex items-center justify-center gap-2">
+                            <i class="bi bi-check-lg"></i> Ajouter
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/js/slik-upload.js"></script>
+    <script>
+        let galerieWidgetInitialized = false;
+        function initGalerieUpload() {
+            if (!galerieWidgetInitialized) {
+                SLIK_UPLOAD.init('upload-galerie', { tenantSlug: '{{ tenant.slug }}', btnSaveId: 'btn-save-galerie' });
+                galerieWidgetInitialized = true;
+            }
+        }
+        function resetForm() {
+            document.getElementById('upload-galerie-cloudinary-id').value = '';
+            document.getElementById('upload-galerie-cloudinary-url').value = '';
+            document.getElementById('btn-save-galerie').disabled = false;
+            const widgetContainer = document.getElementById('upload-galerie');
+            widgetContainer.innerHTML = '';
+            galerieWidgetInitialized = false;
+            initGalerieUpload();
+        }
+        window.addEventListener('load', resetForm);
+        document.querySelector('[onclick*="galerie-modal"]').addEventListener('click', resetForm);
+    </script>
+</body>
+</html>

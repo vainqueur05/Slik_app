@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Services - {{ tenant.nom }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2 { font-family: 'Montserrat', sans-serif; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-up { animation: fadeUp 0.6s ease-out; }
+        .sticky-bottom { position: sticky; bottom: 0; background: #111; padding-top: 10px; margin-top: 10px; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #D4AF37; }
+        input:checked + .slider:before { transform: translateX(20px); }
+        input:disabled + .slider { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body class="bg-black text-white flex min-h-screen">
+
+    <aside class="w-64 bg-[#0a0a0a] border-r border-gray-800 p-6 flex-shrink-0">
+        <h2 class="text-2xl font-bold text-[#D4AF37] mb-8">{{ tenant.nom }}</h2>
+        <nav class="space-y-1">
+            <a href="/salon/{{ tenant.slug }}/admin" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-house"></i> Accueil</a>
+            <a href="/salon/{{ tenant.slug }}/admin/settings" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-sliders2"></i> Paramètres</a>
+            <a href="/salon/{{ tenant.slug }}/admin/services" class="flex items-center gap-2 py-2.5 px-4 rounded-lg bg-[#D4AF37] bg-opacity-20 text-[#D4AF37] font-semibold"><i class="bi bi-scissors"></i> Services</a>
+            <a href="/salon/{{ tenant.slug }}/admin/coiffeurs" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-people"></i> Équipe</a>
+            <a href="/salon/{{ tenant.slug }}/admin/galerie" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-images"></i> Galerie</a>
+            <a href="/salon/{{ tenant.slug }}/admin/bookings" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-calendar-check"></i> Réservations</a>
+            <a href="/salon/{{ tenant.slug }}/admin/temoignages" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-star"></i> Avis</a>
+            <a href="/salon/{{ tenant.slug }}/admin/theme" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-palette"></i> Thème</a>
+            <a href="/salon/{{ tenant.slug }}/admin/map" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-geo-alt"></i> Carte</a>
+        </nav>
+    </aside>
+
+    <main class="flex-1 p-8 animate-fade-up">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold">Services</h1>
+            <div class="flex gap-2">
+                <a href="/salon/{{ tenant.slug }}/admin/settings" class="text-sm text-gray-400 hover:text-white flex items-center gap-1">
+                    <i class="bi bi-sliders2"></i> Gérer catégories
+                </a>
+                <button onclick="document.getElementById('custom-modal').classList.remove('hidden')"
+                        class="bg-[#D4AF37] text-black px-4 py-2 rounded-full font-bold hover:bg-yellow-500 transition">
+                    <i class="bi bi-plus-circle"></i> + Service personnalisé
+                </button>
+            </div>
+        </div>
+
+        {% if services|length == 0 %}
+        <p class="text-gray-500">Aucun service trouvé. Activez des catégories dans les paramètres.</p>
+        {% else %}
+        <form method="POST" id="services-form">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm" id="services-table">
+                    <thead class="bg-[#111]">
+                        <tr>
+                            <th class="px-4 py-3 text-left">Actif</th>
+                            <th class="px-4 py-3 text-left">VIP</th>
+                            <th class="px-4 py-3 text-left">Catégorie</th>
+                            <th class="px-4 py-3 text-left">Nom</th>
+                            <th class="px-4 py-3 text-left">Prix</th>
+                            <th class="px-4 py-3 text-left">Durée</th>
+                            <th class="px-4 py-3 text-left">Photo</th>
+                            <th class="px-4 py-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sortable-table">
+                        {% for service in services %}
+                        <tr class="border-b border-gray-700 hover:bg-gray-900" data-id="{{ service.id }}">
+                            <td class="px-4 py-2">
+                                <label class="switch">
+                                    <input type="checkbox" name="actif_{{ service.id }}"
+                                        {% if service.actif %}checked{% endif %}
+                                        {% if not service.prix or service.prix == '' or service.prix == 'À définir' %}disabled{% endif %}>
+                                    <span class="slider round"></span>
+                                </label>
+                            </td>
+                            <td class="px-4 py-2">
+                                {% if service.is_vip %}
+                                <span class="bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded">VIP</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-2 text-gray-400">{{ service.categorie }}</td>
+                            <td class="px-4 py-2 font-bold {{ 'text-gray-400' if service.is_preset else 'text-[#D4AF37]' }}">
+                                {{ service.nom }}
+                                {% if not service.is_preset %}<span class="text-xs ml-1">(perso)</span>{% endif %}
+                            </td>
+                            <td class="px-4 py-2">
+                                <input type="text" name="prix_{{ service.id }}" value="{{ service.prix or '' }}"
+                                    class="w-20 bg-black border border-gray-700 rounded p-1 text-white text-xs">
+                            </td>
+                            <td class="px-4 py-2">
+                                <input type="text" name="duree_{{ service.id }}" value="{{ service.duree or '' }}"
+                                    class="w-20 bg-black border border-gray-700 rounded p-1 text-white text-xs">
+                            </td>
+                            <td class="px-4 py-2">
+                                {% if service.photo_url %}
+                                <img src="{{ service.photo_url }}" class="w-8 h-8 rounded object-cover inline mr-1">
+                                {% endif %}
+                                <label class="cursor-pointer text-blue-400 hover:text-blue-300" title="Changer photo">
+                                    <i class="bi bi-camera"></i>
+                                    <input type="file" class="hidden upload-service-photo" data-service-id="{{ service.id }}" accept="image/*">
+                                </label>
+                            </td>
+                            <td class="px-4 py-2 text-right">
+                                {% if not service.is_preset %}
+                                <button type="button" onclick="confirmDelete('{{ service.id }}')" class="text-red-400 hover:underline text-xs">
+                                    <i class="bi bi-trash"></i> Suppr.
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <button type="submit" class="mt-4 bg-[#D4AF37] text-black px-6 py-2 rounded-full font-bold hover:bg-yellow-500 transition">
+                <i class="bi bi-check-lg"></i> Enregistrer les modifications
+            </button>
+        </form>
+        {% endif %}
+
+        <!-- Modal Service personnalisé -->
+        <div id="custom-modal" class="hidden fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50" onclick="if(event.target===this) this.classList.add('hidden')">
+            <div class="bg-[#111] p-6 rounded-xl max-w-md w-full mx-4 border border-[#D4AF37]">
+                <h3 class="text-xl font-bold mb-4 text-[#D4AF37]">Nouveau service personnalisé</h3>
+                <form method="POST" action="/salon/{{ tenant.slug }}/admin/services/create" class="space-y-3">
+                    <input type="text" name="nom" placeholder="Nom du service" required class="w-full bg-black border border-gray-700 rounded p-2 text-white">
+                    <select name="categorie" required class="w-full bg-black border border-gray-700 rounded p-2 text-white">
+                        <option value="">-- Choisir catégorie --</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" name="prix" placeholder="Prix (ex: 15$)" class="w-full bg-black border border-gray-700 rounded p-2 text-white">
+                    <input type="text" name="duree" placeholder="Durée (ex: 1h)" class="w-full bg-black border border-gray-700 rounded p-2 text-white">
+                    <button type="submit" class="w-full bg-[#D4AF37] text-black py-2 rounded-full font-bold hover:bg-yellow-500 transition">
+                        Créer le service
+                    </button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Drag & Drop avec SortableJS
+        const el = document.getElementById('sortable-table');
+        if (el) {
+            new Sortable(el, {
+                handle: 'tr',
+                animation: 150,
+            });
+        }
+
+        // Ajout de l'ordre avant soumission du formulaire principal
+        document.getElementById('services-form')?.addEventListener('submit', function() {
+            const rows = document.querySelectorAll('#sortable-table tr');
+            const ids = Array.from(rows).map(r => r.dataset.id).join(',');
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'ordre';
+            input.value = ids;
+            this.appendChild(input);
+        });
+
+        // Confirmation de suppression pour un service personnalisé
+        function confirmDelete(serviceId) {
+            if (confirm('Supprimer ce service personnalisé ?')) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/salon/{{ tenant.slug }}/admin/services/delete/' + serviceId;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        // Upload photo inline pour chaque service
+        document.querySelectorAll('.upload-service-photo').forEach(input => {
+            input.addEventListener('change', async function() {
+                const file = this.files[0];
+                if (!file) return;
+                const serviceId = this.dataset.serviceId;
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', 'slik_unsigned');
+                try {
+                    const res = await fetch('https://api.cloudinary.com/v1_1/dnns2lagp/auto/upload', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    if (data.secure_url) {
+                        const img = this.parentElement.querySelector('img');
+                        if (img) img.src = data.secure_url;
+                        else {
+                            const newImg = document.createElement('img');
+                            newImg.src = data.secure_url;
+                            newImg.className = 'w-8 h-8 rounded object-cover inline mr-1';
+                            this.parentElement.prepend(newImg);
+                        }
+                        // Sauvegarde en base via la route update-photo
+                        fetch('/salon/{{ tenant.slug }}/admin/services/update-photo', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                            body: `service_id=${serviceId}&photo_url=${encodeURIComponent(data.secure_url)}&photo_cloudinary_id=${data.public_id}`
+                        });
+                    }
+                } catch(e) {
+                    alert('Erreur upload');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

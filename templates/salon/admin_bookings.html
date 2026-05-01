@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Réservations - {{ tenant.nom }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #000; }
+        h1, h2 { font-family: 'Montserrat', sans-serif; }
+    </style>
+</head>
+<body class="bg-black text-white flex min-h-screen">
+    <!-- ========== SIDEBAR COMPLET ========== -->
+    <aside class="w-64 bg-[#0a0a0a] border-r border-gray-800 p-6 flex-shrink-0">
+        <h2 class="text-2xl font-bold text-[#D4AF37] mb-8">{{ tenant.nom }}</h2>
+        <nav class="space-y-1">
+            <a href="/salon/{{ tenant.slug }}/admin" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-house"></i> Accueil</a>
+            <a href="/salon/{{ tenant.slug }}/admin/services" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-scissors"></i> Services</a>
+            <a href="/salon/{{ tenant.slug }}/admin/settings" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-sliders2"></i> Paramètres</a>
+            <a href="/salon/{{ tenant.slug }}/admin/coiffeurs" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-people"></i> Équipe</a>
+            <a href="/salon/{{ tenant.slug }}/admin/galerie" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-images"></i> Galerie</a>
+            <a href="/salon/{{ tenant.slug }}/admin/reservations" class="flex items-center gap-2 py-2.5 px-4 rounded-lg bg-[#D4AF37] bg-opacity-20 text-[#D4AF37] font-semibold"><i class="bi bi-calendar-check"></i> Réservations</a>
+            <a href="/salon/{{ tenant.slug }}/admin/temoignages" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-star"></i> Avis</a>
+            <a href="/salon/{{ tenant.slug }}/admin/theme" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-palette"></i> Thème</a>
+            <a href="/salon/{{ tenant.slug }}/admin/map" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-geo-alt"></i> Carte</a>
+            <a href="/salon/{{ tenant.slug }}" target="_blank" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-box-arrow-up-right"></i> Voir le site</a>
+            <a href="/logout" class="flex items-center gap-2 py-2.5 px-4 rounded-lg text-red-400 hover:bg-gray-800 transition mt-8"><i class="bi bi-box-arrow-left"></i> Déconnexion</a>
+        </nav>
+    </aside>
+
+    <!-- ========== CONTENU PRINCIPAL ========== -->
+    <main class="flex-1 p-8">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold">Réservations</h1>
+            <div class="flex gap-3 items-center">
+                <input type="date" id="date-filter" value="{{ date_str }}" 
+                       class="bg-black border border-gray-700 rounded p-2 text-white text-sm"
+                       onchange="window.location.href='?date=' + this.value">
+                <a href="/salon/{{ tenant.slug }}/admin/reservations/export.pdf?date={{ date_str }}"
+                   class="bg-[#D4AF37] text-black px-4 py-2 rounded-full font-bold hover:bg-yellow-500 transition flex items-center gap-2 text-sm">
+                    <i class="bi bi-filetype-pdf"></i> Export PDF du jour
+                </a>
+            </div>
+        </div>
+
+        {% if reservations|length == 0 %}
+        <p class="text-gray-500">Aucune réservation pour cette date.</p>
+        {% else %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-[#111]">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Heure</th>
+                        <th class="px-4 py-3 text-left">Client</th>
+                        <th class="px-4 py-3 text-left">Téléphone</th>
+                        <th class="px-4 py-3 text-left">Service</th>
+                        <th class="px-4 py-3 text-left">Statut</th>
+                        <th class="px-4 py-3 text-right">WhatsApp</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in reservations %}
+                    <tr class="border-b border-gray-700 hover:bg-gray-900">
+                        <td class="px-4 py-3">{{ r.heure_rdv.strftime('%H:%M') if r.heure_rdv else '-' }}</td>
+                        <td class="px-4 py-3">{{ r.client_nom }}</td>
+                        <td class="px-4 py-3">{{ r.client_tel }}</td>
+                        <td class="px-4 py-3">{{ r.service.nom if r.service else '-' }}</td>
+                        <td class="px-4 py-3">
+                            <select class="statut-select bg-black border border-gray-700 rounded p-1 text-white text-xs"
+                                    data-id="{{ r.id }}" data-slug="{{ tenant.slug }}">
+                                <option value="confirmé" {% if r.statut == 'confirmé' %}selected{% endif %}>Confirmé</option>
+                                <option value="arrivé" {% if r.statut == 'arrivé' %}selected{% endif %}>Arrivé</option>
+                                <option value="no-show" {% if r.statut == 'no-show' %}selected{% endif %}>No-show</option>
+                                <option value="en cours" {% if r.statut == 'en cours' %}selected{% endif %}>En cours</option>
+                            </select>
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            {% if r.client_tel %}
+                            <a href="https://wa.me/{{ r.client_tel }}?text=Bonjour {{ r.client_nom }}, votre rendez-vous au {{ tenant.nom }} est confirmé pour le {{ r.date_rdv.strftime('%d/%m/%Y') }} à {{ r.heure_rdv.strftime('%H:%M') }}" 
+                               target="_blank" class="text-green-500 hover:underline">
+                                <i class="bi bi-whatsapp"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </main>
+
+    <script>
+        // Mise à jour du statut sans rechargement
+        document.querySelectorAll('.statut-select').forEach(select => {
+            select.addEventListener('change', function() {
+                const id = this.dataset.id;
+                const slug = this.dataset.slug;
+                const newStatut = this.value;
+                fetch(`/salon/${slug}/admin/reservation/${id}/statut`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'statut=' + encodeURIComponent(newStatut)
+                }).then(response => {
+                    if (!response.ok) {
+                        alert('Erreur lors de la mise à jour');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
