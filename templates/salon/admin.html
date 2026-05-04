@@ -41,6 +41,8 @@
         .sidebar {
             background: linear-gradient(180deg, var(--bg-card), var(--bg-deep));
             border-right: 1px solid var(--border);
+            width: 250px;
+            flex-shrink: 0;
         }
         
         .nav-link {
@@ -332,34 +334,76 @@
         }
         .toast.show { transform: translateX(0); }
         
-        /* ===== MOBILE ===== */
-        @media (max-width: 768px) {
-            .sidebar { 
-                position: fixed; left: -100%; top: 0; bottom: 0;
-                z-index: 100; transition: left 0.3s;
-                width: 80%; max-width: 300px;
-            }
-            .sidebar.open { left: 0; }
-            .menu-toggle { display: flex !important; }
-        }
-        
+        /* ===== MOBILE SIDEBAR ===== */
         .menu-toggle {
             display: none;
             width: 42px; height: 42px;
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 12px;
-            color: white; align-items: center; justify-content: center;
+            color: white;
+            align-items: center;
+            justify-content: center;
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 101;
+            cursor: pointer;
+        }
+        .menu-toggle i {
+            font-size: 1.5rem;
+            color: var(--gold);
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 99;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .sidebar-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .close-sidebar {
+            display: none;
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 102;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { 
+                position: fixed; left: -250px; top: 0; bottom: 0;
+                z-index: 100; transition: left 0.3s ease;
+                width: 250px;
+            }
+            .sidebar.open { left: 0; }
+            .menu-toggle { display: flex !important; }
+            .close-sidebar { display: block; }
         }
     </style>
 </head>
-<body class="flex min-h-screen">
+<body class="flex min-h-screen relative">
 
     <!-- ===== SIDEBAR ===== -->
-    <aside class="sidebar w-64 p-5 flex-shrink-0">
+    <aside class="sidebar" id="sidebar">
+        <!-- Bouton de fermeture mobile -->
+        <div class="close-sidebar" id="close-sidebar-btn" onclick="closeSidebar()">
+            <i class="bi bi-x-lg"></i>
+        </div>
+
         <!-- Logo Brand -->
-        <div class="mb-8 pb-5" style="border-bottom: 1px solid var(--border);">
-            <div class="flex items-center gap-3">
+        <div class="mb-8 pb-5" style="border-bottom: 1px solid var(--border); padding-top: 60px;">
+            <div class="flex items-center gap-3 px-5">
                 {% if tenant.logo_url %}
                 <img src="{{ tenant.logo_url }}" class="w-12 h-12 rounded-xl object-cover" style="border: 2px solid var(--gold);">
                 {% else %}
@@ -376,7 +420,7 @@
         </div>
         
         <!-- Navigation principale -->
-        <nav class="space-y-1">
+        <nav class="space-y-1 px-5">
             <p class="nav-section-title">Pilotage</p>
             <a href="/salon/{{ tenant.slug }}/admin" class="nav-link active">
                 <i class="bi bi-grid-fill"></i> Tableau de bord
@@ -420,6 +464,14 @@
             </div>
         </nav>
     </aside>
+
+    <!-- Overlay pour mobile -->
+    <div id="sidebar-overlay" class="sidebar-overlay" onclick="closeSidebar()"></div>
+
+    <!-- Bouton hamburger mobile -->
+    <button class="menu-toggle" id="menu-toggle-btn" onclick="openSidebar()">
+        <i class="bi bi-list"></i>
+    </button>
 
     <!-- ===== MAIN ===== -->
     <main class="flex-1 p-6 lg:p-8">
@@ -646,8 +698,33 @@
 
     <div id="toast" class="toast"></div>
 
-    <!-- ===== UPLOAD SCRIPT ===== -->
+    <!-- ===== SCRIPTS ===== -->
     <script>
+        // Gestion de la sidebar mobile
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        const menuToggle = document.getElementById('menu-toggle-btn');
+
+        function openSidebar() {
+            sidebar.classList.add('open');
+            overlay.classList.add('active');
+        }
+
+        function closeSidebar() {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('active');
+        }
+
+        // Ferme la sidebar si on clique sur un lien de navigation (mobile)
+        document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+            link.addEventListener('click', function() {
+                if (window.innerWidth <= 768) {
+                    closeSidebar();
+                }
+            });
+        });
+
+        // ===== UPLOAD SCRIPT =====
         const CLOUD_NAME = 'dnns2lagp';
         const UPLOAD_PRESET = 'slik_unsigned';
 
@@ -783,7 +860,7 @@
             }
         }
 
-        // Init
+        // Init uploaders
         createUploader('logo-upload-container', 'logo-preview', '/salon/{{ tenant.slug }}/admin/update-logo', 'logo_url', 'image/jpeg,image/png,image/webp');
         createUploader('video-upload-container', 'video-preview', '/salon/{{ tenant.slug }}/admin/update-video', 'video_url', 'video/mp4,video/webm');
         createUploader('cover-upload-container', 'cover-preview', '/salon/{{ tenant.slug }}/admin/update-cover', 'cover_url', 'image/jpeg,image/png,image/webp');
