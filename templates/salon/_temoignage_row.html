@@ -34,13 +34,13 @@
         
         <div class="flex gap-1">
             {% if not avis.approved %}
-            <button hx-post="/salon/{{ tenant_slug }}/admin/temoignages/approve/{{ avis.id }}"
-                    hx-target="closest div.bg-\\[\\#111\\]"
-                    hx-swap="outerHTML"
-                    class="bg-green-700 text-white text-xs px-3 py-1 rounded-full hover:bg-green-600 transition">
-                <i class="bi bi-check-lg"></i> Approuver
-            </button>
-            {% endif %}
+<button hx-post="/salon/{{ tenant_slug }}/admin/temoignages/approve/{{ avis.id }}"
+        hx-target="closest div.bg-[#111]"
+        hx-swap="outerHTML"
+        class="bg-green-700 text-white text-xs px-3 py-1 rounded-full hover:bg-green-600 transition">
+    <i class="bi bi-check-lg"></i> Approuver
+</button>
+{% endif %}
             <form method="POST" action="/salon/{{ tenant_slug }}/admin/temoignages/delete/{{ avis.id }}" onsubmit="return confirm('Supprimer ce témoignage ?')">
                 <button type="submit" class="bg-red-700 text-white text-xs px-3 py-1 rounded-full hover:bg-red-600 transition">
                     <i class="bi bi-trash"></i> Supprimer
