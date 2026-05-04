@@ -446,7 +446,7 @@
                 <div class="stat-icon-wrap">
                     <i class="bi bi-calendar-check"></i>
                 </div>
-                <div class="stat-number">{{ counts.bookings }}</div>
+                <div class="stat-number">{{ counts.reservations }}</div>
                 <div class="stat-label">Réservations</div>
                 <div class="stat-trend">
                     <i class="bi bi-arrow-up text-xs"></i> Live
@@ -585,11 +585,11 @@
                 <h4 class="font-bold text-sm mb-1">Équipe</h4>
                 <span class="quick-count">{{ counts.coiffeurs }}</span>
             </a>
-            <a href="/salon/{{ tenant.slug }}/admin/bookings" class="quick-card">
+            <a href="/salon/{{ tenant.slug }}/admin/reservations" class="quick-card">
                 <i class="bi bi-arrow-up-right quick-arrow"></i>
                 <div class="quick-icon"><i class="bi bi-calendar-check"></i></div>
                 <h4 class="font-bold text-sm mb-1">RDV</h4>
-                <span class="quick-count">{{ counts.bookings }}</span>
+                <span class="quick-count">{{ counts.reservations }}</span>
             </a>
             <a href="/salon/{{ tenant.slug }}/admin/galerie" class="quick-card">
                 <i class="bi bi-arrow-up-right quick-arrow"></i>
