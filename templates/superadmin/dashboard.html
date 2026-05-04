@@ -28,37 +28,42 @@
     <main class="p-6">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             {% for tenant in tenants %}
-            <div class="bg-[#111] border border-gray-800 rounded-xl p-6 hover:border-[#D4AF37] transition relative">
-                <div class="flex justify-between items-start mb-4">
-                    <div>
-                        <h2 class="text-xl font-bold">{{ tenant.nom }}</h2>
-                        <p class="text-sm text-gray-400">{{ tenant.ville }}</p>
-                        <p class="text-xs text-gray-600 font-mono">{{ tenant.slug }}</p>
+            <!-- CARTE TENANT avec data-expire -->
+            <div class="tenant-card bg-[#111] border border-gray-800 rounded-xl p-6 hover:border-[#D4AF37] transition relative"
+                 data-expire="{{ tenant.expire_at }}"
+                 data-tenant-name="{{ tenant.nom }}">
+                <!-- Face avant (contenu normal) -->
+                <div class="front">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h2 class="text-xl font-bold">{{ tenant.nom }}</h2>
+                            <p class="text-sm text-gray-400">{{ tenant.ville }}</p>
+                            <p class="text-xs text-gray-600 font-mono">{{ tenant.slug }}</p>
+                        </div>
+                        <span class="voyant voyant-{{ tenant.voyant }}" title="{{ tenant.voyant | capitalize }}"></span>
                     </div>
-                    <!-- Voyant LOI 13 -->
-                    <span class="voyant voyant-{{ tenant.voyant }}" title="{{ tenant.voyant | capitalize }}"></span>
-                </div>
-                <div class="text-sm text-gray-300 space-y-1 mb-4">
-                    <p>Créé le : {{ tenant.created_at }}</p>
-                    <p>Paiement : {{ tenant.last_payment }}</p>
-                </div>
-                <div class="flex gap-2 text-xs">
-                    <button 
-                        hx-get="/superadmin/logs/{{ tenant.id }}" 
-                        hx-target="#log-modal-content" 
-                        hx-trigger="click"
-                        onclick="document.getElementById('log-modal').classList.remove('hidden')"
-                        class="text-[#D4AF37] underline hover:text-yellow-500">
-                        📋 Logs
-                    </button>
-                    <form method="POST" action="/superadmin/tenant/toggle/{{ tenant.id }}" class="inline">
-                        <button type="submit" class="text-{{ 'red' if tenant.active else 'green' }}-400 underline">
-                            {{ 'Suspendre' if tenant.active else 'Activer' }}
+                    <div class="text-sm text-gray-300 space-y-1 mb-4">
+                        <p>Créé le : {{ tenant.created_at }}</p>
+                        <p>Paiement : {{ tenant.last_payment }}</p>
+                    </div>
+                    <div class="flex gap-2 text-xs">
+                        <button 
+                            hx-get="/superadmin/logs/{{ tenant.id }}" 
+                            hx-target="#log-modal-content" 
+                            hx-trigger="click"
+                            onclick="document.getElementById('log-modal').classList.remove('hidden')"
+                            class="text-[#D4AF37] underline hover:text-yellow-500">
+                            📋 Logs
                         </button>
-                    </form>
-                    <form method="POST" action="/superadmin/tenant/extend/{{ tenant.id }}" class="inline">
-                        <button type="submit" class="text-blue-400 underline">+30j</button>
-                    </form>
+                        <form method="POST" action="/superadmin/tenant/toggle/{{ tenant.id }}" class="inline">
+                            <button type="submit" class="text-{{ 'red' if tenant.active else 'green' }}-400 underline">
+                                {{ 'Suspendre' if tenant.active else 'Activer' }}
+                            </button>
+                        </form>
+                        <form method="POST" action="/superadmin/tenant/extend/{{ tenant.id }}" class="inline">
+                            <button type="submit" class="text-blue-400 underline">+30j</button>
+                        </form>
+                    </div>
                 </div>
             </div>
             {% endfor %}
@@ -76,5 +81,108 @@
                     class="mt-4 bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-600">Fermer</button>
         </div>
     </div>
+
+    <!-- ===== CSS 3D FLIP ===== -->
+    <style>
+        .tenant-card {
+            perspective: 1000px;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            position: relative;
+        }
+        .tenant-card .front,
+        .tenant-card .back {
+            backface-visibility: hidden;
+            transition: transform 0.6s ease;
+        }
+        .tenant-card .front {
+            transform: rotateY(0deg);
+        }
+        .tenant-card .back {
+            position: absolute;
+            inset: 0;
+            transform: rotateY(180deg);
+            background: #1a1a1a;
+            border: 1px solid #D4AF37;
+            border-radius: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            text-align: center;
+        }
+        .tenant-card.flipped .front {
+            transform: rotateY(-180deg);
+        }
+        .tenant-card.flipped .back {
+            transform: rotateY(0deg);
+        }
+        @media (hover: hover) {
+            .tenant-card:hover .front { transform: rotateY(-180deg); }
+            .tenant-card:hover .back { transform: rotateY(0deg); }
+        }
+    </style>
+
+    <!-- ===== JS COUNTDOWN + FLIP MOBILE ===== -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.tenant-card');
+
+            cards.forEach(card => {
+                const expireStr = card.dataset.expire;
+                if (!expireStr) return;
+
+                // --- CONSTRUCTION DE LA FACE ARRIÈRE ---
+                const back = document.createElement('div');
+                back.className = 'back';
+                back.innerHTML = `
+                    <span class="text-[#D4AF37] text-2xl font-bold mb-4">${card.dataset.tenantName}</span>
+                    <div class="expire-countdown text-white font-mono" id="countdown-${card.dataset.tenantName.replace(/\s/g, '')}">
+                        Chargement...
+                    </div>
+                `;
+                card.appendChild(back);
+
+                // --- COMPTE À REBOURS ---
+                const countdownEl = back.querySelector('.expire-countdown');
+                function updateCountdown() {
+                    const now = new Date().getTime();
+                    const expire = new Date(expireStr).getTime();
+                    const distance = expire - now;
+
+                    if (distance < 0) {
+                        countdownEl.innerHTML = '<span class="text-red-500 text-3xl font-extrabold">EXPIRÉ</span>';
+                        return;
+                    }
+
+                    const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+                    countdownEl.innerHTML = `
+                        <div class="grid grid-cols-4 gap-2 text-center">
+                            <div class="bg-black/50 rounded p-2"><span class="text-xl font-bold">${days}</span><br><span class="text-xs">J</span></div>
+                            <div class="bg-black/50 rounded p-2"><span class="text-xl font-bold">${hours}</span><br><span class="text-xs">H</span></div>
+                            <div class="bg-black/50 rounded p-2"><span class="text-xl font-bold">${minutes}</span><br><span class="text-xs">M</span></div>
+                            <div class="bg-black/50 rounded p-2"><span class="text-xl font-bold">${seconds}</span><br><span class="text-xs">S</span></div>
+                        </div>
+                    `;
+                }
+                updateCountdown();
+                setInterval(updateCountdown, 1000);
+
+                // --- FLIP SUR MOBILE (tap) ---
+                card.addEventListener('click', (e) => {
+                    // Ignore les clics sur les boutons/liens
+                    if (e.target.closest('button, a, form, input')) return;
+                    if (window.innerWidth <= 768) { // mobile
+                        card.classList.toggle('flipped');
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>
