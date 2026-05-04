@@ -8,23 +8,93 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background: #000; }
+        :root {
+            --gold: #D4AF37;
+            --bg-card: #0d0d0d;
+            --border: rgba(255,255,255,0.06);
+        }
+        body { font-family: 'Inter', sans-serif; background: #050505; color: white; }
         h1, h2 { font-family: 'Montserrat', sans-serif; }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            background: linear-gradient(180deg, var(--bg-card), #050505);
+            border-right: 1px solid var(--border);
+            width: 250px;
+            flex-shrink: 0;
+        }
+        .nav-link {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px; border-radius: 12px;
+            color: #a1a1aa; font-weight: 500; transition: all 0.3s; font-size: 0.92rem;
+        }
+        .nav-link:hover { background: rgba(255,255,255,0.04); color: white; transform: translateX(2px); }
+        .nav-link.active {
+            background: linear-gradient(135deg, rgba(212,175,55,0.1), transparent);
+            color: var(--gold); border: 1px solid rgba(212,175,55,0.25);
+        }
+        .nav-link i { font-size: 1.1rem; width: 20px; }
+
+        .menu-toggle {
+            display: none;
+            width: 42px; height: 42px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; color: white;
+            align-items: center; justify-content: center;
+            position: fixed; top: 16px; left: 16px; z-index: 101; cursor: pointer;
+        }
+        .menu-toggle i { font-size: 1.5rem; color: var(--gold); }
+        .sidebar-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            z-index: 99; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .sidebar-overlay.active { opacity: 1; pointer-events: auto; }
+        .close-sidebar {
+            display: none; position: absolute; top: 16px; right: 16px;
+            color: white; font-size: 1.5rem; cursor: pointer; z-index: 102;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; left: -250px; top: 0; bottom: 0; z-index: 100; transition: left 0.3s ease; }
+            .sidebar.open { left: 0; }
+            .menu-toggle { display: flex !important; }
+            .close-sidebar { display: block; }
+        }
     </style>
 </head>
-<body class="bg-black text-white flex min-h-screen">
-    <aside class="w-64 bg-[#0a0a0a] border-r border-gray-800 p-6 flex-shrink-0">
-        <h2 class="text-2xl font-bold text-[#D4AF37] mb-8">{{ tenant.nom }}</h2>
-        <nav class="space-y-1">
-            <a href="/salon/{{ tenant.slug }}/admin" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-house"></i> Accueil</a>
-            <a href="/salon/{{ tenant.slug }}/admin/services" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-scissors"></i> Services</a>
-            <a href="/salon/{{ tenant.slug }}/admin/settings" class="flex items-center gap-2 py-2.5 px-4 rounded-lg bg-[#D4AF37] bg-opacity-20 text-[#D4AF37] font-semibold"><i class="bi bi-sliders2"></i> Paramètres</a>
-            <a href="/salon/{{ tenant.slug }}/admin/reservations" class="flex items-center gap-2 py-2.5 px-4 rounded-lg hover:bg-gray-800 transition"><i class="bi bi-calendar-check"></i> Réservations</a>
-            <!-- autres liens... -->
+<body class="flex min-h-screen relative">
+
+    <!-- ========== SIDEBAR ========== -->
+    <aside class="sidebar" id="sidebar">
+        <div class="close-sidebar" id="close-sidebar-btn" onclick="closeSidebar()">
+            <i class="bi bi-x-lg"></i>
+        </div>
+        <div class="px-5 pt-16 pb-5">
+            <h2 class="text-2xl font-bold text-[#D4AF37]">{{ tenant.nom }}</h2>
+        </div>
+        <nav class="space-y-1 px-5">
+            <a href="/salon/{{ tenant.slug }}/admin" class="nav-link"><i class="bi bi-house"></i> Accueil</a>
+            <a href="/salon/{{ tenant.slug }}/admin/services" class="nav-link"><i class="bi bi-scissors"></i> Services</a>
+            <a href="/salon/{{ tenant.slug }}/admin/settings" class="nav-link active"><i class="bi bi-sliders2"></i> Paramètres</a>
+            <a href="/salon/{{ tenant.slug }}/admin/coiffeurs" class="nav-link"><i class="bi bi-people"></i> Équipe</a>
+            <a href="/salon/{{ tenant.slug }}/admin/galerie" class="nav-link"><i class="bi bi-images"></i> Galerie</a>
+            <a href="/salon/{{ tenant.slug }}/admin/reservations" class="nav-link"><i class="bi bi-calendar-check"></i> Réservations</a>
+            <a href="/salon/{{ tenant.slug }}/admin/temoignages" class="nav-link"><i class="bi bi-star"></i> Avis</a>
+            <a href="/salon/{{ tenant.slug }}/admin/theme" class="nav-link"><i class="bi bi-palette"></i> Thème</a>
+            <a href="/salon/{{ tenant.slug }}/admin/map" class="nav-link"><i class="bi bi-geo-alt"></i> Carte</a>
         </nav>
     </aside>
 
-    <main class="flex-1 p-8">
+    <!-- Overlay mobile -->
+    <div id="sidebar-overlay" class="sidebar-overlay" onclick="closeSidebar()"></div>
+
+    <!-- Bouton hamburger mobile -->
+    <button class="menu-toggle" id="menu-toggle-btn" onclick="openSidebar()">
+        <i class="bi bi-list"></i>
+    </button>
+
+    <!-- ========== CONTENU PRINCIPAL ========== -->
+    <main class="flex-1 p-6 lg:p-8">
         <h1 class="text-3xl font-bold mb-6">Paramètres du salon</h1>
         <div class="bg-[#111] border border-gray-800 rounded-xl p-6 max-w-2xl">
             <h2 class="text-xl font-bold mb-4 text-[#D4AF37]">Types de Services Proposés</h2>
@@ -45,5 +115,24 @@
             </form>
         </div>
     </main>
+
+    <script>
+        // ===== Sidebar mobile =====
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        function openSidebar() {
+            sidebar.classList.add('open');
+            overlay.classList.add('active');
+        }
+        function closeSidebar() {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('active');
+        }
+        document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+            link.addEventListener('click', function() {
+                if (window.innerWidth <= 768) closeSidebar();
+            });
+        });
+    </script>
 </body>
 </html>
