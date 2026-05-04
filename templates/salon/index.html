@@ -548,26 +548,57 @@
 <body>
 
     <!-- ===== NAVBAR ===== -->
-    <nav class="navbar-fixed" id="navbar">
-        <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
-            <div class="flex items-center gap-3">
-                {% if tenant.logo_url %}
-                <img src="{{ tenant.logo_url }}" class="w-11 h-11 rounded-full object-cover" style="border: 2px solid var(--gold);">
-                {% endif %}
-                <span class="font-display text-xl font-bold" style="color: var(--gold);">{{ tenant.nom }}</span>
-            </div>
-            <div class="hidden md:flex items-center gap-8">
-                <a href="#services" class="nav-link-modern text-sm">Services</a>
-                <a href="#equipe" class="nav-link-modern text-sm">Équipe</a>
-                <a href="#galerie" class="nav-link-modern text-sm">Galerie</a>
-                <a href="#temoignages" class="nav-link-modern text-sm">Avis</a>
-                <button onclick="openBookingModal()" class="btn-cta-secondary text-sm" style="padding: 10px 22px;">
-                    <i class="bi bi-calendar-check"></i> Réserver
-                </button>
-            </div>
+<nav class="navbar-fixed" id="navbar" x-data="{ open: false }">
+    <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
+        <!-- Logo + Nom -->
+        <div class="flex items-center gap-3">
+            {% if tenant.logo_url %}
+            <img src="{{ tenant.logo_url }}" class="w-11 h-11 rounded-full object-cover" style="border: 2px solid var(--gold);">
+            {% endif %}
+            <span class="font-display text-xl font-bold" style="color: var(--gold);">{{ tenant.nom }}</span>
         </div>
-    </nav>
 
+        <!-- ========== MENU DESKTOP ========== -->
+        <div class="hidden md:flex items-center gap-8">
+            <a href="#services" class="nav-link-modern text-sm">Services</a>
+            <a href="#equipe" class="nav-link-modern text-sm">Équipe</a>
+            <a href="#galerie" class="nav-link-modern text-sm">Galerie</a>
+            <a href="#temoignages" class="nav-link-modern text-sm">Avis</a>
+            <button onclick="openBookingModal()" class="btn-cta-secondary text-sm" style="padding: 10px 22px;">
+                <i class="bi bi-calendar-check"></i> Réserver
+            </button>
+        </div>
+
+        <!-- ========== BOUTON HAMBURGER MOBILE ========== -->
+        <button @click="open = !open" class="md:hidden text-white p-2 focus:outline-none z-50" aria-label="Menu">
+            <i class="bi" :class="open ? 'bi-x-lg' : 'bi-list'" style="font-size: 2rem; color: var(--gold);"></i>
+        </button>
+    </div>
+
+    <!-- ========== MENU MOBILE DROPDOWN ========== -->
+    <div 
+        x-show="open" 
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0 -translate-y-4"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100 translate-y-0"
+        x-transition:leave-end="opacity-0 -translate-y-4"
+        class="md:hidden px-6 pb-6 pt-2"
+        style="background: rgba(5,5,5,0.95); backdrop-filter: blur(20px);"
+        @click.outside="open = false"
+    >
+        <div class="flex flex-col gap-4 items-center text-center">
+            <a href="#services" @click="open = false" class="nav-link-modern text-base py-2 w-full">Services</a>
+            <a href="#equipe" @click="open = false" class="nav-link-modern text-base py-2 w-full">Équipe</a>
+            <a href="#galerie" @click="open = false" class="nav-link-modern text-base py-2 w-full">Galerie</a>
+            <a href="#temoignages" @click="open = false" class="nav-link-modern text-base py-2 w-full">Avis</a>
+            <button onclick="openBookingModal()" class="btn-cta-secondary text-base w-full justify-center" style="padding: 12px 22px;" @click="open = false">
+                <i class="bi bi-calendar-check"></i> Réserver
+            </button>
+        </div>
+    </div>
+</nav>
     <!-- ===== HERO PREMIUM ===== -->
     <section class="hero-section">
         <div class="hero-bg"></div>
